@@ -3,8 +3,8 @@ package com.opendev.odata.domain.table.service;
 
 import com.opendev.odata.domain.table.dto.ColumnDTO;
 import com.opendev.odata.domain.table.dto.TableSchemaDTO;
-import com.opendev.odata.framework.service.DemoEdmProvider;
-import com.opendev.odata.framework.service.DemoEntityCollectionProcessor;
+import com.opendev.odata.framework.service.CustomEdmProvider;
+import com.opendev.odata.framework.service.CustomEntityCollectionProcessor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,8 +18,8 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class TableService {
-    private final DemoEntityCollectionProcessor demoEntityCollectionProcessor;
-    private final DemoEdmProvider  demoEdmProvider;
+    private final CustomEntityCollectionProcessor customEntityCollectionProcessor;
+    private final CustomEdmProvider customEdmProvider;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -56,7 +56,7 @@ public class TableService {
 
     private void registerTableInOData(String tableName) {
         TableSchemaDTO tableSchema = fetchTableSchemaFromDatabase(tableName);
-        demoEdmProvider.registerTable(tableSchema);
+        customEdmProvider.registerTable(tableSchema);
     }
 
     public TableSchemaDTO fetchTableSchemaFromDatabase(String tableName) {

@@ -18,6 +18,7 @@ import org.apache.olingo.server.api.uri.UriResource;
 import org.apache.olingo.server.api.uri.UriResourceEntitySet;
 import org.springframework.stereotype.Component;
 
+
 import javax.persistence.EntityManager;
 import java.io.InputStream;
 import java.net.URI;
@@ -31,7 +32,7 @@ import java.util.Locale;
  */
 @Component
 @RequiredArgsConstructor
-public class DemoEntityCollectionProcessor implements EntityCollectionProcessor {
+public class CustomEntityCollectionProcessor implements EntityCollectionProcessor {
 
 	private OData odata;
 	private ServiceMetadata serviceMetadata;
@@ -123,5 +124,6 @@ public class DemoEntityCollectionProcessor implements EntityCollectionProcessor 
 	        throw new ODataRuntimeException("Unable to create id for entity: " + entitySetName, e);
 	    }
 	}
+
 
 }

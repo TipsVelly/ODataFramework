@@ -12,7 +12,7 @@ import java.util.*;
 
 @Component
 @RequiredArgsConstructor
-public class DemoEdmProvider extends CsdlAbstractEdmProvider {
+public class CustomEdmProvider extends CsdlAbstractEdmProvider {
 
 	private Map<String, TableSchemaDTO> dynamicTables = new HashMap<>();
 
