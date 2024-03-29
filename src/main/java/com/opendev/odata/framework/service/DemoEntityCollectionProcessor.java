@@ -1,27 +1,14 @@
-package com.opendev.odata.service;
+package com.opendev.odata.framework.service;
 
-import java.io.InputStream;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.util.List;
-
-import org.apache.olingo.commons.api.data.ContextURL;
-import org.apache.olingo.commons.api.data.Entity;
-import org.apache.olingo.commons.api.data.EntityCollection;
-import org.apache.olingo.commons.api.data.Property;
-import org.apache.olingo.commons.api.data.ValueType;
+import lombok.RequiredArgsConstructor;
+import org.apache.olingo.commons.api.data.*;
 import org.apache.olingo.commons.api.edm.EdmEntitySet;
 import org.apache.olingo.commons.api.edm.EdmEntityType;
 import org.apache.olingo.commons.api.ex.ODataRuntimeException;
 import org.apache.olingo.commons.api.format.ContentType;
 import org.apache.olingo.commons.api.http.HttpHeader;
 import org.apache.olingo.commons.api.http.HttpStatusCode;
-import org.apache.olingo.server.api.OData;
-import org.apache.olingo.server.api.ODataApplicationException;
-import org.apache.olingo.server.api.ODataLibraryException;
-import org.apache.olingo.server.api.ODataRequest;
-import org.apache.olingo.server.api.ODataResponse;
-import org.apache.olingo.server.api.ServiceMetadata;
+import org.apache.olingo.server.api.*;
 import org.apache.olingo.server.api.processor.EntityCollectionProcessor;
 import org.apache.olingo.server.api.serializer.EntityCollectionSerializerOptions;
 import org.apache.olingo.server.api.serializer.ODataSerializer;
@@ -31,17 +18,25 @@ import org.apache.olingo.server.api.uri.UriResource;
 import org.apache.olingo.server.api.uri.UriResourceEntitySet;
 import org.springframework.stereotype.Component;
 
-import com.opendev.odata.util.Constants;
+import javax.persistence.EntityManager;
+import java.io.InputStream;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.List;
+import java.util.Locale;
 
 /**
  * @author Subash
  * @since 2/28/2021
  */
 @Component
+@RequiredArgsConstructor
 public class DemoEntityCollectionProcessor implements EntityCollectionProcessor {
 
 	private OData odata;
 	private ServiceMetadata serviceMetadata;
+
+	private final EntityManager entityManager;
 
 	public void init(OData odata, ServiceMetadata serviceMetadata) {
 		this.odata = odata;
@@ -84,43 +79,43 @@ public class DemoEntityCollectionProcessor implements EntityCollectionProcessor 
 		response.setHeader(HttpHeader.CONTENT_TYPE, responseFormat.toContentTypeString());
 	}
 
-	private EntityCollection getData(EdmEntitySet edmEntitySet) {
+	private EntityCollection getData(EdmEntitySet edmEntitySet) throws ODataApplicationException {
+		EntityCollection collection = new EntityCollection();
 
-		EntityCollection productsCollection = new EntityCollection();
-		// check for which EdmEntitySet the data is requested
-		if (Constants.ES_PRODUCTS_NAME.equals(edmEntitySet.getName())) {
-			List<Entity> productList = productsCollection.getEntities();
-
-			String stringDataType = "String";
-			String description = "Description";
-			String products = "Products";
-			
-			// add some sample product entities
-			final Entity e1 = new Entity().addProperty(new Property("int", "ID", ValueType.PRIMITIVE, 1))
-					.addProperty(new Property(stringDataType, "Name", ValueType.PRIMITIVE, "Notebook Basic 15"))
-					.addProperty(new Property(stringDataType, description, ValueType.PRIMITIVE,
-							"Notebook Basic, 1.7GHz - 15 XGA - 1024MB DDR2 SDRAM - 40GB"));
-			e1.setId(createId(products, 1));
-			productList.add(e1);
-
-			final Entity e2 = new Entity().addProperty(new Property("int", "ID", ValueType.PRIMITIVE, 2))
-					.addProperty(new Property(stringDataType, "Name", ValueType.PRIMITIVE, "1UMTS PDA"))
-					.addProperty(new Property(stringDataType, description, ValueType.PRIMITIVE,
-							"Ultrafast 3G UMTS/HSDPA Pocket PC, supports GSM network"));
-			e2.setId(createId(products, 1));
-			productList.add(e2);
-
-			final Entity e3 = new Entity().addProperty(new Property("int", "ID", ValueType.PRIMITIVE, 3))
-					.addProperty(new Property(stringDataType, "Name", ValueType.PRIMITIVE, "Ergo Screen"))
-					.addProperty(new Property(stringDataType, description, ValueType.PRIMITIVE,
-							"19 Optimum Resolution 1024 x 768 @ 85Hz, resolution 1280 x 960"));
-			e3.setId(createId(products, 1));
-			productList.add(e3);
+		// EdmEntitySet의 이름에서 's'를 제거하여 실제 테이블 이름을 유추합니다.
+		String actualTableName = edmEntitySet.getName();
+		if (actualTableName.endsWith("s")) {
+			actualTableName = actualTableName.substring(0, actualTableName.length() - 1);
 		}
 
-		return productsCollection;
+		try {
+			// 수정된 테이블 이름을 사용하여 데이터베이스 쿼리를 실행합니다.
+			List<Object[]> results = entityManager.createNativeQuery("SELECT * FROM " + actualTableName).getResultList();
+			for (Object[] row : results) {
+				Entity entity = new Entity();
+
+				// 각 열에 대한 데이터를 Entity의 프로퍼티로 추가합니다.
+				// 열 인덱스는 결과 세트의 구조에 따라 조정되어야 합니다.
+				entity.addProperty(new Property(null, "ID", ValueType.PRIMITIVE, row[0]));
+				entity.addProperty(new Property(null, "Name", ValueType.PRIMITIVE, row[1]));
+				entity.addProperty(new Property(null, "Description", ValueType.PRIMITIVE, row[2]));
+
+				// ID를 기반으로 Entity의 ID를 생성합니다.
+				entity.setId(createId(edmEntitySet.getName(), row[0]));
+
+				// EntityCollection의 리스트에 Entity를 추가합니다.
+				collection.getEntities().add(entity);
+			}
+		} catch (Exception e) {
+			// 쿼리 실행 중 오류가 발생한 경우, ODataApplicationException을 던집니다.
+			throw new ODataApplicationException("Error fetching data from database",
+					HttpStatusCode.INTERNAL_SERVER_ERROR.getStatusCode(), Locale.getDefault());
+		}
+		return collection;
 	}
-	
+
+
+
 	private URI createId(String entitySetName, Object id) {
 	    try {
 	        return new URI(entitySetName + "(" + id + ")");

@@ -1,4 +1,4 @@
-package com.opendev.odata.util;
+package com.opendev.odata.framework.util;
 
 import org.apache.olingo.commons.api.edm.FullQualifiedName;
 

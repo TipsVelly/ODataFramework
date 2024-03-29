@@ -1,4 +1,4 @@
-package com.opendev.odata.controller;
+package com.opendev.odata.framework.controller;
 
 import java.util.ArrayList;
 
