@@ -20,7 +20,7 @@ public class CustomEdmProvider extends CsdlAbstractEdmProvider {
 	public List<CsdlSchema> getSchemas() throws ODataException {
 		List<CsdlSchema> schemas = new ArrayList<>();
 		CsdlSchema schema = new CsdlSchema();
-		schema.setNamespace("OData.Demo");
+		schema.setNamespace("OData.framework");
 
 		schema.setEntityTypes(new ArrayList<>(getEntityTypes().values()));
 
@@ -55,7 +55,7 @@ public class CustomEdmProvider extends CsdlAbstractEdmProvider {
 
 	private Map<String, CsdlEntitySet> getEntitySets() {
 		Map<String, CsdlEntitySet> entitySets = new HashMap<>();
-		dynamicTables.forEach((tableName, tableSchema) -> entitySets.put(tableName + "s", createCsdlEntitySet(tableName + "s", new FullQualifiedName("OData.Demo", tableName))));
+		dynamicTables.forEach((tableName, tableSchema) -> entitySets.put(tableName + "s", createCsdlEntitySet(tableName + "s", new FullQualifiedName("OData.framework", tableName))));
 		return entitySets;
 	}
 
@@ -86,7 +86,7 @@ public class CustomEdmProvider extends CsdlAbstractEdmProvider {
 	@Override
 	public CsdlEntityContainerInfo getEntityContainerInfo(FullQualifiedName entityContainerName) throws ODataException {
 		if (entityContainerName == null || "Container".equals(entityContainerName.getName())) {
-			return new CsdlEntityContainerInfo().setContainerName(new FullQualifiedName("OData.Demo", "Container"));
+			return new CsdlEntityContainerInfo().setContainerName(new FullQualifiedName("OData.framework", "Container"));
 		}
 		return null;
 	}

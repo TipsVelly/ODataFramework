@@ -61,6 +61,7 @@ public class TableService {
 
     public TableSchemaDTO fetchTableSchemaFromDatabase(String tableName) {
         // 예시로, 간단한 테이블 스키마 정보를 하드코딩합니다. 실제로는 데이터베이스 메타데이터를 조회하는 로직이 필요합니다.
+        // 테이블을 명시하는 테이블과 테이블의 컬럼정보를 명시하는 테이블에서 데이터를 가져와야함
         TableSchemaDTO schema = new TableSchemaDTO();
         schema.setTableName(tableName);
         List<ColumnDTO> columns = new ArrayList<>();

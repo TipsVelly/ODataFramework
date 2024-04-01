@@ -9,7 +9,7 @@ public final class Constants {
     }
 	
 	// Service Namespace
-	public static final String NAMESPACE = "OData.Demo";
+	public static final String NAMESPACE = "OData.framework";
 
 	// EDM Container
 	public static final String CONTAINER_NAME = "Container";
