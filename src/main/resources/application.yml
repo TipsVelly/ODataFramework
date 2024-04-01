@@ -3,16 +3,19 @@ server:
 
 spring:
   datasource:
-    url: jdbc:mysql://localhost:3306/olingo?useSSL=false&serverTimezone=UTC
-    username: root
+    url: jdbc:postgresql://211.232.75.41:5433/tdx_db
+    username: <NEED_TO_INPUT>
     password: <NEED_TO_INPUT>
   jpa:
     hibernate:
       ddl-auto: validate
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.MySQL5Dialect
+        dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
         highlight_sql: true
         use_sql_comments: true
     show-sql: true
+mybatis:
+  type-aliases-package: com.opendev.odata.domain.table
+  mapper-locations: classpath:mappers/**/*.xml
