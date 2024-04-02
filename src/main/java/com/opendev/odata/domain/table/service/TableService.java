@@ -12,8 +12,6 @@ import org.springframework.transaction.annotation.Transactional;
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
 import javax.persistence.Query;
-import java.util.ArrayList;
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -27,7 +25,7 @@ public class TableService {
     @Transactional
     public void createTableAndRegisterOData(TableSchemaDTO tableSchema) {
         createTable(tableSchema);
-        registerTableInOData(tableSchema.getTableName());
+        registerTableInOData(tableSchema);
     }
 
     private void createTable(TableSchemaDTO tableSchema) {
@@ -54,23 +52,11 @@ public class TableService {
     }
 
 
-    private void registerTableInOData(String tableName) {
-        TableSchemaDTO tableSchema = fetchTableSchemaFromDatabase(tableName);
+    private void registerTableInOData(TableSchemaDTO tableSchema) {
         customEdmProvider.registerTable(tableSchema);
     }
 
-    public TableSchemaDTO fetchTableSchemaFromDatabase(String tableName) {
-        // 예시로, 간단한 테이블 스키마 정보를 하드코딩합니다. 실제로는 데이터베이스 메타데이터를 조회하는 로직이 필요합니다.
-        // 테이블을 명시하는 테이블과 테이블의 컬럼정보를 명시하는 테이블에서 데이터를 가져와야함
-        TableSchemaDTO schema = new TableSchemaDTO();
-        schema.setTableName(tableName);
-        List<ColumnDTO> columns = new ArrayList<>();
-        columns.add(new ColumnDTO("ID", "Integer"));
-        columns.add(new ColumnDTO("Name", "String"));
-        columns.add(new ColumnDTO("Description", "String"));
-        schema.setColumns(columns);
-        return schema;
-    }
+
 
 
 

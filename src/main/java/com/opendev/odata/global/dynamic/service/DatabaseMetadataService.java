@@ -1,21 +1,51 @@
 package com.opendev.odata.global.dynamic.service;
 
+import com.opendev.odata.domain.table.dto.ColumnDTO;
+import com.opendev.odata.domain.table.dto.TableSchemaDTO;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
+import java.util.ArrayList;
 import java.util.List;
+
 
 @Service
 public class DatabaseMetadataService {
 
     @PersistenceContext
     private EntityManager entityManager;
+
     @Transactional
-    public List<String> getAllTableNames() {
-        // PostgreSQL의 시스템 카탈로그에서 테이블 이름 조회
-        String query = "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'";
-        return entityManager.createNativeQuery(query).getResultList();
+    public List<TableSchemaDTO> getTableSchemas() {
+        List<TableSchemaDTO> tableSchemas = new ArrayList<>();
+
+        // tdx_table 테이블에서 모든 테이블 정보를 조회하는 네이티브 SQL 쿼리
+        List<Object[]> tables = entityManager.createNativeQuery(
+                        "SELECT t.table_id, t.table_name FROM tdx_table t")
+                .getResultList();
+
+        for (Object[] table : tables) {
+            Integer tableId = (Integer) table[0];
+            String tableName = (String) table[1];
+
+            // tdx_column 테이블에서 현재 테이블의 컬럼 정보를 조회하는 네이티브 SQL 쿼리
+            List<Object[]> columnsData = entityManager.createNativeQuery(
+                            "SELECT c.column_name, c.column_type FROM tdx_column c WHERE c.table_id = :tableId")
+                    .setParameter("tableId", tableId)
+                    .getResultList();
+
+            List<ColumnDTO> columns = new ArrayList<>();
+            for (Object[] columnData : columnsData) {
+                String columnName = (String) columnData[0];
+                String columnType = (String) columnData[1];
+                columns.add(new ColumnDTO(columnName, columnType));
+            }
+
+            tableSchemas.add(new TableSchemaDTO(tableName, columns));
+        }
+
+        return tableSchemas;
     }
 }
