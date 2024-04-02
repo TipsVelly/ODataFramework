@@ -2,6 +2,7 @@ package com.opendev.odata.global.init;
 
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Bean;
@@ -14,6 +15,7 @@ import javax.persistence.PersistenceContext;
 
 @Configuration
 @RequiredArgsConstructor
+@Slf4j
 public class InitDatabaseSchema {
 
     @Autowired
@@ -65,14 +67,14 @@ public class InitDatabaseSchema {
     @Transactional
     public boolean tableNotExists(String tableName) {
         try {
-            String query = "SELECT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = :tableName)";
+            // 파라미터 처리 불가로 인해 불가피하게 1 사용
+            String query = "SELECT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = ?1)";
             Boolean exists = (Boolean) entityManager.createNativeQuery(query)
-                    .setParameter("tableName", tableName)
+                    .setParameter(1, tableName)
                     .getSingleResult();
             return !exists;
         } catch (Exception e) {
-            // 로그를 통해 예외 정보를 확인
-            e.printStackTrace();
+            log.error("테이블 존재 여부 확인 중 오류 발생: {}", tableName, e);
             return false;
         }
     }
