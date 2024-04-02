@@ -32,8 +32,8 @@ public class DatabaseMetadataService {
 
             // tdx_column 테이블에서 현재 테이블의 컬럼 정보를 조회하는 네이티브 SQL 쿼리
             List<Object[]> columnsData = entityManager.createNativeQuery(
-                            "SELECT c.column_name, c.column_type FROM tdx_column c WHERE c.table_id = :tableId")
-                    .setParameter("tableId", tableId)
+                            "SELECT c.column_name, c.column_type FROM tdx_column c WHERE c.table_id = ?1")
+                    .setParameter(1, tableId)
                     .getResultList();
 
             List<ColumnDTO> columns = new ArrayList<>();
