@@ -23,7 +23,7 @@ public class DatabaseMetadataService {
 
         // tdx_table 테이블에서 모든 테이블 정보를 조회하는 네이티브 SQL 쿼리
         List<Object[]> tables = entityManager.createNativeQuery(
-                        "SELECT t.table_id, t.table_name FROM tdx_table t")
+                        "SELECT t.id, t.name FROM tdx_table t")
                 .getResultList();
 
         for (Object[] table : tables) {
@@ -32,7 +32,7 @@ public class DatabaseMetadataService {
 
             // tdx_column 테이블에서 현재 테이블의 컬럼 정보를 조회하는 네이티브 SQL 쿼리
             List<Object[]> columnsData = entityManager.createNativeQuery(
-                            "SELECT c.column_name, c.column_type FROM tdx_column c WHERE c.table_id = ?1")
+                            "SELECT c.name, c.type FROM tdx_column c WHERE c.table_id = ?1")
                     .setParameter(1, tableId)
                     .getResultList();
 

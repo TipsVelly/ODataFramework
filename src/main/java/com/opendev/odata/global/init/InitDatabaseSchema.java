@@ -59,7 +59,6 @@ public class InitDatabaseSchema {
                             "column_id SERIAL PRIMARY KEY, " +
                             "table_id INT NOT NULL REFERENCES tdx_table(table_id), " +
                             "column_name VARCHAR(255) NOT NULL, " +
-                            "column_description TEXT, " +
                             "column_type VARCHAR(255) NOT NULL" +
                             ")").executeUpdate();
         }
