@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.opendev.odata.framework.mapper.CustomJpaRepository">
+
+    <select id="findById" resultType="java.util.Map">
+        SELECT * FROM ${tableName} WHERE id = #{id}
+    </select>
+
+    <select id="findByName" resultType="java.util.Map">
+        SELECT * FROM ${tableName} WHERE name = #{name}
+    </select>
+
+    <select id="existsById" resultType="boolean">
+        SELECT COUNT(*) > 0 FROM ${tableName} WHERE id = #{id}
+    </select>
+
+    <select id="findAll" resultType="java.util.Map">
+        SELECT * FROM ${tableName}
+    </select>
+
+    <select id="findAllById" resultType="java.util.Map">
+        SELECT * FROM ${tableName}
+        WHERE id IN
+        <foreach item="id" collection="ids" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+    <select id="count" resultType="long">
+        SELECT COUNT(*) FROM ${tableName}
+    </select>
+
+    <delete id="deleteById">
+        DELETE FROM ${tableName} WHERE id = #{id}
+    </delete>
+
+    <delete id="delete">
+        DELETE FROM ${tableName} WHERE id = #{id}
+    </delete>
+
+    <delete id="deleteAll">
+        DELETE FROM ${tableName}
+    </delete>
+
+</mapper>
