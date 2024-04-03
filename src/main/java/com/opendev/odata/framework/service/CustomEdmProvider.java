@@ -2,6 +2,8 @@ package com.opendev.odata.framework.service;
 
 import com.opendev.odata.domain.table.dto.ColumnDTO;
 import com.opendev.odata.domain.table.dto.TableSchemaDTO;
+import com.opendev.odata.framework.mapper.CustomJpaRepository;
+import com.opendev.odata.framework.mapper.EdmProviderMapper;
 import com.opendev.odata.global.dynamic.service.DatabaseMetadataService;
 import lombok.RequiredArgsConstructor;
 import org.apache.olingo.commons.api.edm.EdmPrimitiveTypeKind;
@@ -9,6 +11,7 @@ import org.apache.olingo.commons.api.edm.FullQualifiedName;
 import org.apache.olingo.commons.api.edm.provider.*;
 import org.apache.olingo.commons.api.ex.ODataException;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
 
@@ -17,6 +20,8 @@ import java.util.*;
 public class CustomEdmProvider extends CsdlAbstractEdmProvider {
 
 	private final DatabaseMetadataService databaseMetadataService;
+	private final EdmProviderMapper edmProviderMapper;
+	private final CustomJpaRepository  customJpaRepository;
 
 	private Map<String, TableSchemaDTO> dynamicTables = new HashMap<>();
 
@@ -97,9 +102,21 @@ public class CustomEdmProvider extends CsdlAbstractEdmProvider {
 		return null;
 	}
 
+	@Transactional
 	public void registerTable(TableSchemaDTO tableSchema) {
+		// tdx_table에 테이블 정보 저장
+		edmProviderMapper.insertTable(tableSchema.getTableName(), "Table description"); // 간단한 설명 추가
+
+		// tdx_table에서 방금 삽입한 테이블의 ID 조회 (예제를 단순화하기 위해 생략)
+		Map<String, Object>  map = customJpaRepository.findByName( "tdx_table", tableSchema.getTableName());
+		Long id = (long) (Integer) map.get("id");
+		// 각 컬럼 정보를 tdx_column에 저장
+		tableSchema.getColumns().forEach(column -> {
+			edmProviderMapper.insertColumn(id, column.getColumnName(), column.getColumnType());
+		});
 
 	}
+
 
 	private FullQualifiedName convertPostgresTypeToEdmType(String postgresType) {
 		postgresType = postgresType.toLowerCase();
