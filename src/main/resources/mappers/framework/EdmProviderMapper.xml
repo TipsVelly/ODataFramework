@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.opendev.odata.framework.mapper.EdmProviderMapper">
+    <insert id="insertTable" parameterType="map">
+        INSERT INTO tdx_table (name, description)
+        VALUES (#{tableName}, #{tableDescription})
+    </insert>
+
+    <insert id="insertColumn" parameterType="map">
+        INSERT INTO tdx_column (table_id, name, type)
+        VALUES (#{tableId}, #{columnName}, #{columnType})
+    </insert>
+
+
+</mapper>
