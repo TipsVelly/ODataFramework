@@ -30,10 +30,6 @@
         SELECT COUNT(*) FROM ${tableName}
     </select>
 
-    <delete id="deleteById">
-        DELETE FROM ${tableName} WHERE id = #{id}
-    </delete>
-
     <delete id="delete">
         DELETE FROM ${tableName} WHERE id = #{id}
     </delete>
@@ -42,4 +38,27 @@
         DELETE FROM ${tableName}
     </delete>
 
+    <insert id="create" parameterType="map">
+        INSERT INTO ${tableName}
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <foreach collection="data" item="item" index="key" separator=",">
+                ${key}
+            </foreach>
+        </trim>
+        <trim prefix="VALUES (" suffix=")" suffixOverrides=",">
+            <foreach collection="data" item="item" index="key" separator=",">
+                #{item}
+            </foreach>
+        </trim>
+    </insert>
+
+    <update id="update" parameterType="map">
+        UPDATE ${tableName}
+        <set>
+            <foreach collection="data" item="item" index="key" separator=",">
+                ${key} = #{item}
+            </foreach>
+        </set>
+        WHERE id = #{id}
+    </update>
 </mapper>

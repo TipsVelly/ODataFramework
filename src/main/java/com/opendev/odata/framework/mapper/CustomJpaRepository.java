@@ -26,13 +26,20 @@ public interface CustomJpaRepository {
     // 객체 개수 세기, 테이블 이름 동적으로 처리
     long count(@Param("tableName") String tableName);
 
-    // ID로 객체 삭제, 테이블 이름 동적으로 처리
-    void deleteById(@Param("tableName") String tableName, @Param("id") Long id);
-
     // 객체 삭제, 테이블 이름 동적으로 처리
     void delete(@Param("tableName") String tableName, @Param("id") Long id);
 
     // 모든 객체 삭제, 테이블 이름 동적으로 처리
     void deleteAll(@Param("tableName") String tableName);
+
+    // 새로운 엔티티 생성
+    Long create(@Param("tableName") String tableName, @Param("data") Map<String, Object> entityData);
+
+    // 엔티티 수정
+    void update(@Param("tableName") String tableName, @Param("data") Map<String, Object> entityData);
+
+    // 엔티티 수정
+    void update(@Param("tableName") String tableName, @Param("id") Long id, @Param("data") Map<String, Object> entityData);
+
 }
 

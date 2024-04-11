@@ -44,9 +44,9 @@ public class InitDatabaseSchema {
         if (tableNotExists("tdx_table")) {
             entityManager.createNativeQuery(
                     "CREATE TABLE tdx_table (" +
-                            "table_id SERIAL PRIMARY KEY, " +
-                            "table_name VARCHAR(255) NOT NULL, " +
-                            "table_description TEXT" +
+                            "id SERIAL PRIMARY KEY, " +
+                            "name VARCHAR(255) NOT NULL, " +
+                            "description TEXT" +
                             ")").executeUpdate();
         }
     }
@@ -56,10 +56,10 @@ public class InitDatabaseSchema {
         if (tableNotExists("tdx_column")) {
             entityManager.createNativeQuery(
                     "CREATE TABLE tdx_column (" +
-                            "column_id SERIAL PRIMARY KEY, " +
+                            "id SERIAL PRIMARY KEY, " +
                             "table_id INT NOT NULL REFERENCES tdx_table(table_id), " +
-                            "column_name VARCHAR(255) NOT NULL, " +
-                            "column_type VARCHAR(255) NOT NULL" +
+                            "name VARCHAR(255) NOT NULL, " +
+                            "type VARCHAR(255) NOT NULL" +
                             ")").executeUpdate();
         }
     }

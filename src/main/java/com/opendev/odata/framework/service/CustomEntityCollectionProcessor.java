@@ -1,5 +1,7 @@
 package com.opendev.odata.framework.service;
 
+import com.opendev.odata.framework.mapper.CustomJpaRepository;
+import com.opendev.odata.global.dynamic.service.DatabaseMetadataService;
 import lombok.RequiredArgsConstructor;
 import org.apache.olingo.commons.api.data.*;
 import org.apache.olingo.commons.api.edm.EdmEntitySet;
@@ -18,13 +20,13 @@ import org.apache.olingo.server.api.uri.UriResource;
 import org.apache.olingo.server.api.uri.UriResourceEntitySet;
 import org.springframework.stereotype.Component;
 
-
 import javax.persistence.EntityManager;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * @author Subash
@@ -39,11 +41,15 @@ public class CustomEntityCollectionProcessor implements EntityCollectionProcesso
 
 	private final EntityManager entityManager;
 
+	private final DatabaseMetadataService databaseMetadataService;
+
+	private final CustomJpaRepository customJpaRepository;
+
 	public void init(OData odata, ServiceMetadata serviceMetadata) {
 		this.odata = odata;
 		this.serviceMetadata = serviceMetadata;
 	}
-
+	@Override
 	public void readEntityCollection(ODataRequest request, ODataResponse response, UriInfo uriInfo,
 			ContentType responseFormat) throws ODataApplicationException, ODataLibraryException {
 
@@ -83,38 +89,45 @@ public class CustomEntityCollectionProcessor implements EntityCollectionProcesso
 	private EntityCollection getData(EdmEntitySet edmEntitySet) throws ODataApplicationException {
 		EntityCollection collection = new EntityCollection();
 
-		// EdmEntitySet의 이름에서 's'를 제거하여 실제 테이블 이름을 유추합니다.
-		String actualTableName = edmEntitySet.getName();
-		if (actualTableName.endsWith("s")) {
-			actualTableName = actualTableName.substring(0, actualTableName.length() - 1);
-		}
+		String originalTableName = edmEntitySet.getName();
+		String actualTableName = originalTableName.endsWith("s") ? originalTableName.substring(0, originalTableName.length() - 1) : originalTableName;
 
-		try {
-			// 수정된 테이블 이름을 사용하여 데이터베이스 쿼리를 실행합니다.
-			List<Object[]> results = entityManager.createNativeQuery("SELECT * FROM " + actualTableName).getResultList();
-			for (Object[] row : results) {
-				Entity entity = new Entity();
+		List<Map<String, Object>> results = customJpaRepository.findAll(actualTableName);
 
-				// 각 열에 대한 데이터를 Entity의 프로퍼티로 추가합니다.
-				// 열 인덱스는 결과 세트의 구조에 따라 조정되어야 합니다.
-				entity.addProperty(new Property(null, "ID", ValueType.PRIMITIVE, row[0]));
-				entity.addProperty(new Property(null, "Name", ValueType.PRIMITIVE, row[1]));
-				entity.addProperty(new Property(null, "Description", ValueType.PRIMITIVE, row[2]));
+		for (Map<String, Object> row : results) {
+			Entity entity = new Entity();
 
-				// ID를 기반으로 Entity의 ID를 생성합니다.
-				entity.setId(createId(edmEntitySet.getName(), row[0]));
-
-				// EntityCollection의 리스트에 Entity를 추가합니다.
-				collection.getEntities().add(entity);
+			// 'ID' 속성을 명시적으로 설정합니다.
+			Object idValue = row.get("id");
+			if (idValue != null) {
+				entity.addProperty(new Property(null, "ID", ValueType.PRIMITIVE, idValue));
+				entity.setId(createId(edmEntitySet.getName(), idValue.toString()));
+			} else {
+				throw new ODataApplicationException("ID is null for some entities", HttpStatusCode.INTERNAL_SERVER_ERROR.getStatusCode(), Locale.getDefault());
 			}
-		} catch (Exception e) {
-			// 쿼리 실행 중 오류가 발생한 경우, ODataApplicationException을 던집니다.
-			throw new ODataApplicationException("Error fetching data from database",
-					HttpStatusCode.INTERNAL_SERVER_ERROR.getStatusCode(), Locale.getDefault());
+
+			// 나머지 속성들을 동적으로 추가합니다.
+			row.forEach((columnName, value) -> {
+				if (!"id".equalsIgnoreCase(columnName)) { // 'id' 컬럼은 이미 처리했습니다.
+					String propertyName = toPascalCase(columnName);
+					entity.addProperty(new Property(null, propertyName, ValueType.PRIMITIVE, value));
+				}
+			});
+
+			collection.getEntities().add(entity);
 		}
+
 		return collection;
 	}
 
+
+	private String toPascalCase(String columnName) {
+		if (columnName == null || columnName.isEmpty()) {
+			return columnName;
+		}
+		// 첫 글자만 대문자로 변환
+		return columnName.substring(0, 1).toUpperCase() + columnName.substring(1).toLowerCase();
+	}
 
 
 	private URI createId(String entitySetName, Object id) {

@@ -1,6 +1,5 @@
 package com.opendev.odata.framework.service;
 
-import com.opendev.odata.domain.table.dto.ColumnDTO;
 import com.opendev.odata.domain.table.dto.TableSchemaDTO;
 import com.opendev.odata.framework.mapper.CustomJpaRepository;
 import com.opendev.odata.framework.mapper.EdmProviderMapper;
@@ -23,22 +22,23 @@ public class CustomEdmProvider extends CsdlAbstractEdmProvider {
 	private final EdmProviderMapper edmProviderMapper;
 	private final CustomJpaRepository  customJpaRepository;
 
-	private Map<String, TableSchemaDTO> dynamicTables = new HashMap<>();
-
 	@Override
 	public List<CsdlSchema> getSchemas() throws ODataException {
 		List<CsdlSchema> schemas = new ArrayList<>();
 		CsdlSchema schema = new CsdlSchema();
 		schema.setNamespace("OData.framework");
 
-		// 엔티티 타입 설정 set
+		// 데이터베이스에서 테이블 스키마 정보 조회
 		List<TableSchemaDTO> tableSchemas = databaseMetadataService.getTableSchemas();
-		schema.setEntityTypes(createEntityTypes(tableSchemas));
+		List<CsdlEntityType> entityTypes = new ArrayList<>();
 
-		//엔티티 컨테이너 set
-		CsdlEntityContainer container = createEntityContainer(tableSchemas);
-		schema.setEntityContainer(container);
+		// 각 TableSchemaDTO에 대해서 CsdlEntityType 생성
+		for (TableSchemaDTO tableSchema : tableSchemas) {
+			entityTypes.add(createCsdlEntityType(tableSchema));
+		}
 
+		schema.setEntityTypes(entityTypes);
+		schema.setEntityContainer(createEntityContainer(tableSchemas));
 
 		schemas.add(schema);
 		return schemas;
@@ -46,29 +46,53 @@ public class CustomEdmProvider extends CsdlAbstractEdmProvider {
 
 	private Map<String, CsdlEntityType> getEntityTypes() {
 		Map<String, CsdlEntityType> entityTypes = new HashMap<>();
-		dynamicTables.forEach((tableName, tableSchema) -> entityTypes.put(tableName, createCsdlEntityType(tableSchema)));
+		// 데이터베이스에서 테이블 스키마 정보 조회
+		List<TableSchemaDTO> tableSchemas = databaseMetadataService.getTableSchemas();
+		for (TableSchemaDTO tableSchema : tableSchemas) {
+			entityTypes.put(tableSchema.getTableName(), createCsdlEntityType(tableSchema));
+		}
 		return entityTypes;
 	}
+
 
 	private CsdlEntityType createCsdlEntityType(TableSchemaDTO tableSchema) {
 		List<CsdlProperty> csdlProperties = new ArrayList<>();
 		CsdlPropertyRef propertyRef = new CsdlPropertyRef();
-		propertyRef.setName("ID"); // Assuming 'ID' as the primary key
+		propertyRef.setName("ID"); // 'ID'를 기본 키로 가정합니다.
 
-		tableSchema.getColumns().forEach(column -> csdlProperties.add(new CsdlProperty()
-				.setName(column.getColumnName())
-				.setType(convertPostgresTypeToEdmType(column.getColumnType()))));
+		// ID 속성을 생성하고, Nullable=false로 설정하여 null 값을 허용하지 않도록 합니다.
+		CsdlProperty idProperty = new CsdlProperty()
+				.setName("ID")
+				.setType(EdmPrimitiveTypeKind.Int16.getFullQualifiedName()) // 유형을 Edm.Int32로 설정합니다.
+				.setNullable(false); // Nullable=false로 설정합니다.
+		csdlProperties.add(idProperty);
 
-		return new CsdlEntityType().setName(tableSchema.getTableName())
+		// 기타 모든 컬럼을 속성으로 추가합니다.
+		tableSchema.getColumns().stream()
+				.filter(column -> !column.getColumnName().equals("ID")) // 'ID' 컬럼은 이미 추가되었으므로 제외합니다.
+				.forEach(column -> csdlProperties.add(new CsdlProperty()
+						.setName(column.getColumnName())
+						.setType(convertPostgresTypeToEdmType(column.getColumnType()))
+						.setNullable(true))); // 기타 속성에 대한 Nullable 설정은 필요에 따라 조정할 수 있습니다.
+
+		// CsdlEntityType 인스턴스를 생성하고 설정된 속성과 키를 할당합니다.
+		return new CsdlEntityType()
+				.setName(tableSchema.getTableName())
 				.setProperties(csdlProperties)
 				.setKey(Collections.singletonList(propertyRef));
 	}
 
 	private Map<String, CsdlEntitySet> getEntitySets() {
 		Map<String, CsdlEntitySet> entitySets = new HashMap<>();
-		dynamicTables.forEach((tableName, tableSchema) -> entitySets.put(tableName + "s", createCsdlEntitySet(tableName + "s", new FullQualifiedName("OData.framework", tableName))));
+		// 데이터베이스에서 테이블 스키마 정보 조회
+		List<TableSchemaDTO> tableSchemas = databaseMetadataService.getTableSchemas();
+		for (TableSchemaDTO tableSchema : tableSchemas) {
+			String entitySetName = tableSchema.getTableName() + "s";
+			entitySets.put(entitySetName, createCsdlEntitySet(entitySetName, new FullQualifiedName("OData.framework", tableSchema.getTableName())));
+		}
 		return entitySets;
 	}
+
 
 	public CsdlEntitySet createCsdlEntitySet(String entitySetName, FullQualifiedName entityTypeFQN) {
 		return new CsdlEntitySet().setName(entitySetName).setType(entityTypeFQN);
@@ -114,7 +138,6 @@ public class CustomEdmProvider extends CsdlAbstractEdmProvider {
 		tableSchema.getColumns().forEach(column -> {
 			edmProviderMapper.insertColumn(id, column.getColumnName(), column.getColumnType());
 		});
-
 	}
 
 
@@ -171,25 +194,6 @@ public class CustomEdmProvider extends CsdlAbstractEdmProvider {
 		}
 	}
 
-	private List<CsdlEntityType> createEntityTypes(List<TableSchemaDTO> tableSchemas) {
-		List<CsdlEntityType> entityTypes = new ArrayList<>();
-		for (TableSchemaDTO tableSchema : tableSchemas) {
-			List<CsdlProperty> csdlProperties = new ArrayList<>();
-			for (ColumnDTO column : tableSchema.getColumns()) {
-				CsdlProperty property = new CsdlProperty()
-						.setName(column.getColumnName())
-						.setType(convertPostgresTypeToEdmType(column.getColumnType()));
-				csdlProperties.add(property);
-			}
-
-			CsdlEntityType entityType = new CsdlEntityType()
-					.setName(tableSchema.getTableName())
-					.setProperties(csdlProperties)
-					.setKey(Arrays.asList(new CsdlPropertyRef().setName("ID"))); // ID를 기본 키로 가정
-			entityTypes.add(entityType);
-		}
-		return entityTypes;
-	}
 
 	private CsdlEntityContainer createEntityContainer(List<TableSchemaDTO> tableSchemas) {
 		CsdlEntityContainer container = new CsdlEntityContainer().setName("Container");
