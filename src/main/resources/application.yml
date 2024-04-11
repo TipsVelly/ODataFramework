@@ -1,11 +1,12 @@
 server:
-  port: 8080
+  port: 8081
 
 spring:
   datasource:
-    url: jdbc:postgresql://211.232.75.41:5433/tdx_db
-    username: <NEED_TO_INPUT>
-    password: <NEED_TO_INPUT>
+    driverClassName: net.sf.log4jdbc.sql.jdbcapi.DriverSpy
+    url: jdbc:log4jdbc:postgresql://211.232.75.41:5433/tdx_db
+    username: tdx_user
+    password: tdx_password
   jpa:
     hibernate:
       ddl-auto: validate
@@ -15,6 +16,7 @@ spring:
         format_sql: true
         highlight_sql: true
         use_sql_comments: true
+        default_batch_fetch_size: 100
     show-sql: true
 mybatis:
   type-aliases-package: com.opendev.odata.domain.table
