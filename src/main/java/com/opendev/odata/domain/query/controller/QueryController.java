@@ -1,14 +1,15 @@
 package com.opendev.odata.domain.query.controller;
 
-
 import com.opendev.odata.domain.query.dto.QueryDto;
 import com.opendev.odata.domain.query.dto.QueryWithIdDto;
 import com.opendev.odata.domain.query.service.QueryService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.NoSuchElementException;
 
 @RestController
 @RequestMapping("/api/v1/query")
@@ -18,9 +19,9 @@ public class QueryController {
     private final QueryService queryService;
 
     @PostMapping
-    public void saveQuery(@RequestBody QueryDto queryDTO) {
+    public ResponseEntity<?> saveQuery(@RequestBody QueryDto queryDTO) {
         queryService.saveQuery(queryDTO);
-
+        return new ResponseEntity<>("Query created successfully", HttpStatus.CREATED);
     }
 
     @GetMapping("/{id}")
@@ -29,13 +30,23 @@ public class QueryController {
     }
 
     @PutMapping("/{id}")
-    public void updateQuery(@PathVariable Long id, @RequestBody QueryWithIdDto queryWithIdDto) {
-        queryService.updateQuery(id, queryWithIdDto);
+    public ResponseEntity<?> updateQuery(@PathVariable Long id, @RequestBody QueryWithIdDto queryWithIdDto) {
+        try {
+            queryService.updateQuery(id, queryWithIdDto);
+            return ResponseEntity.ok("Query updated successfully");
+        } catch (NoSuchElementException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Query not found");
+        }
     }
 
     @DeleteMapping("/{id}")
-    public void deleteQuery(@PathVariable Long id) {
-        queryService.deleteQuery(id);
+    public ResponseEntity<?> deleteQuery(@PathVariable Long id) {
+        try {
+            queryService.deleteQuery(id);
+            return ResponseEntity.noContent().build();
+        } catch (NoSuchElementException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Query not found");
+        }
     }
 
     @GetMapping("/all")
