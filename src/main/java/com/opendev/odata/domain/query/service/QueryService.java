@@ -1,7 +1,9 @@
 package com.opendev.odata.domain.query.service;
 
 
-import com.opendev.odata.domain.query.dto.QueryDTO;
+import com.opendev.odata.domain.query.dto.QueryDto;
+import com.opendev.odata.domain.query.dto.QueryParamDto;
+import com.opendev.odata.domain.query.dto.QueryWithIdDto;
 import com.opendev.odata.domain.query.entity.TdxQuery;
 import com.opendev.odata.domain.query.entity.TdxQueryParam;
 import com.opendev.odata.domain.query.repository.QueryParamRepository;
@@ -10,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
@@ -18,46 +21,46 @@ public class QueryService {
     private final QueryRepository queryRepository;
     private final QueryParamRepository  queryParamRepository;
 
-    public void saveQuery(QueryDTO queryDTO) {
+    public void saveQuery(QueryDto queryDto) {
         TdxQuery tdxQuery = TdxQuery.builder()
-                .title(queryDTO.getTitle())
-                .query(queryDTO.getQuery())
+                .title(queryDto.getTitle())
+                .query(queryDto.getQuery())
                 .build();
+        TdxQuery savedQuery = queryRepository.save(tdxQuery);
 
-        List<TdxQueryParam> params = queryDTO.getParameters().stream()
+        List<TdxQueryParam> params = queryDto.getParameters().stream()
                 .map(paramDTO -> TdxQueryParam.builder()
                         .parameter(paramDTO.getParameter())
                         .attribute(paramDTO.getAttribute())
-                        .tdxQuery(tdxQuery)
+                        .tdxQuery(savedQuery)
                         .build())
                 .collect(Collectors.toList());
 
-        //tdxQuery.setTdxQueryParams(params);
-        queryRepository.save(tdxQuery);
+        queryParamRepository.saveAll(params);
     }
 
-    public QueryDTO getQueryById(Long id) {
+    public QueryWithIdDto getQueryById(Long id) {
         TdxQuery tdxQuery = queryRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Query not found"));
 
-        return QueryDTO.fromEntity(tdxQuery);
+        return QueryWithIdDto.fromEntity(tdxQuery);
     }
 
-    public void updateQuery(QueryDTO queryDTO) {
-        TdxQuery existingQuery = queryRepository.findById(queryDTO.getId())
-                .orElseThrow(() -> new RuntimeException("Query not found"));
+//    public void updateQuery(QueryUpdateDto queryUpdateDto) {
+//        TdxQuery existingQuery = queryRepository.findById(queryUpdateDto.getId())
+//                .orElseThrow(() -> new RuntimeException("Query not found"));
+//
+//        TdxQuery updatedQuery = TdxQuery.builder()
+//                .id(existingQuery.getId())
+//                .title(queryUpdateDto.getTitle())
+//                .query(queryUpdateDto.getQuery())
+//                .tdxQueryParams(updateQueryParams(existingQuery, queryUpdateDto.getParameters()))
+//                .build();
+//
+//        queryRepository.save(updatedQuery);
+//    }
 
-        TdxQuery updatedQuery = TdxQuery.builder()
-                .id(existingQuery.getId())
-                .title(queryDTO.getTitle())
-                .query(queryDTO.getQuery())
-                .tdxQueryParams(updateQueryParams(existingQuery, queryDTO))
-                .build();
-
-        queryRepository.save(updatedQuery);
-    }
-
-    private List<TdxQueryParam> updateQueryParams(TdxQuery existingQuery, QueryDTO queryDTO) {
+    private List<TdxQueryParam> updateQueryParams(TdxQuery existingQuery, QueryDto queryDTO) {
         List<TdxQueryParam> existingParams = existingQuery.getTdxQueryParams();
         List<TdxQueryParam> newParams = queryDTO.getParameters().stream()
                 .map(paramDTO -> TdxQueryParam.builder()
@@ -73,4 +76,26 @@ public class QueryService {
     public void deleteQuery(Long id) {
         queryRepository.deleteById(id);
     }
+
+    public List<QueryWithIdDto> getAllQueries() {
+        List<TdxQuery> allQueries = queryRepository.findAll();
+        return allQueries.stream()
+                .map(QueryWithIdDto::fromEntity)
+                .collect(Collectors.toList());
+    }
+
+    public void updateQuery(Long id, QueryWithIdDto queryWithIdDto) {
+        TdxQuery tdxQuery = queryRepository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("TdxQuery not found. ID: " + id));
+
+        tdxQuery.updateTitleAndQuery(queryWithIdDto.getTitle(), queryWithIdDto.getQuery());
+
+        List<TdxQueryParam> newParams = queryWithIdDto.getParameters().stream()
+                .map(QueryParamDto::toEntity)
+                .collect(Collectors.toList());
+        tdxQuery.updateParameters(newParams);
+
+        queryRepository.save(tdxQuery);
+    }
+
 }

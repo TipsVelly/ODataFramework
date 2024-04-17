@@ -25,7 +25,20 @@ public class TdxQuery {
     @Column(columnDefinition = "TEXT")
     private String query;
 
-    @OneToMany(mappedBy = "tdxQuery")
+    @OneToMany(mappedBy = "tdxQuery", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<TdxQueryParam> tdxQueryParams = new ArrayList<>();
+    // 비즈니스 로직으로 상태 변경
+    public void updateTitleAndQuery(String title, String query) {
+        this.title = title;
+        this.query = query;
+    }
+
+    public void updateParameters(List<TdxQueryParam> newParams) {
+        this.tdxQueryParams.clear();
+        for (TdxQueryParam param : newParams) {
+            param.assignToQuery(this);
+            this.tdxQueryParams.add(param);
+        }
+    }
 
 }

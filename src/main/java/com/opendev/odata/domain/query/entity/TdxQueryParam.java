@@ -25,4 +25,9 @@ public class TdxQueryParam {
     private String parameter;
 
     private String attribute;
+    // TdxQuery 객체와의 관계를 설정하는 메소드
+    public void assignToQuery(TdxQuery query) {
+        this.tdxQuery = query;
+    }
+
 }
