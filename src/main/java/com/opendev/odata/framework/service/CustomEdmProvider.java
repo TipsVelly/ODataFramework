@@ -22,6 +22,11 @@ public class CustomEdmProvider extends CsdlAbstractEdmProvider {
 	private final EdmProviderMapper edmProviderMapper;
 	private final CustomJpaRepository  customJpaRepository;
 
+
+	private static final FullQualifiedName ACTION_RESET = new FullQualifiedName("OData.framework", "ResetDemo");
+	private static final FullQualifiedName FUNCTION_GET_ALL = new FullQualifiedName("OData.framework", "GetAllEntities");
+
+
 	@Override
 	public List<CsdlSchema> getSchemas() throws ODataException {
 		List<CsdlSchema> schemas = new ArrayList<>();
@@ -38,6 +43,11 @@ public class CustomEdmProvider extends CsdlAbstractEdmProvider {
 		}
 
 		schema.setEntityTypes(entityTypes);
+
+		schema.setActions(Collections.singletonList(defineResetAction()));
+		schema.setFunctions(Collections.singletonList(defineGetAllFunction()));
+
+
 		schema.setEntityContainer(createEntityContainer(tableSchemas));
 
 		schemas.add(schema);
@@ -142,14 +152,23 @@ public class CustomEdmProvider extends CsdlAbstractEdmProvider {
 
 
 	private FullQualifiedName convertPostgresTypeToEdmType(String postgresType) {
-		postgresType = postgresType.toLowerCase();
+		if (postgresType == null || postgresType.trim().isEmpty()) {
+			// 입력된 타입이 없거나 공백만 있는 경우 기본 타입으로 처리
+			return EdmPrimitiveTypeKind.String.getFullQualifiedName();
+		}
 
-		// Extract the base type without precision/scale for types like "decimal(10, 2)".
+		// Normalize the input and extract the base type
+		postgresType = postgresType.toLowerCase().trim();
+		String[] parts = postgresType.split("\\s+"); // Split on whitespace
+		if (parts.length > 0) {
+			postgresType = parts[0]; // Consider only the first part as the type
+		}
+
+		// Extract the base type without precision/scale for types like "decimal(10, 2)"
 		int parenIndex = postgresType.indexOf('(');
 		if (parenIndex != -1) {
 			postgresType = postgresType.substring(0, parenIndex);
 		}
-
 
 		if (postgresType.startsWith("varchar") || postgresType.startsWith("char") || postgresType.equals("text")) {
 			return EdmPrimitiveTypeKind.String.getFullQualifiedName();
@@ -157,11 +176,13 @@ public class CustomEdmProvider extends CsdlAbstractEdmProvider {
 
 		switch (postgresType) {
 			case "serial":
+			case "smallserial":
 			case "integer":
 			case "int":
 			case "smallint":
-				return EdmPrimitiveTypeKind.Int16.getFullQualifiedName();
+				return EdmPrimitiveTypeKind.Int32.getFullQualifiedName();
 			case "bigint":
+			case "bigserial":
 				return EdmPrimitiveTypeKind.Int64.getFullQualifiedName();
 			case "boolean":
 				return EdmPrimitiveTypeKind.Boolean.getFullQualifiedName();
@@ -172,27 +193,49 @@ public class CustomEdmProvider extends CsdlAbstractEdmProvider {
 				return EdmPrimitiveTypeKind.Single.getFullQualifiedName();
 			case "double precision":
 				return EdmPrimitiveTypeKind.Double.getFullQualifiedName();
-			case "char":
-			case "varchar":
-			case "text":
-				return EdmPrimitiveTypeKind.String.getFullQualifiedName();
 			case "date":
 				return EdmPrimitiveTypeKind.Date.getFullQualifiedName();
 			case "time":
 				return EdmPrimitiveTypeKind.TimeOfDay.getFullQualifiedName();
 			case "timestamp":
-			case "timestamp without time zone":
+			case "timestamp with time zone":
 				return EdmPrimitiveTypeKind.DateTimeOffset.getFullQualifiedName();
 			case "bytea":
 				return EdmPrimitiveTypeKind.Binary.getFullQualifiedName();
 			case "uuid":
 				return EdmPrimitiveTypeKind.Guid.getFullQualifiedName();
-			// PostgreSQL의 배열 유형, JSON 유형 등과 같은 더 많은 유형에 대한 매핑이 필요할 수 있습니다.
-			// 해당 유형에 맞는 EDM 유형으로 매핑을 추가하세요.
+			case "interval":
+				return EdmPrimitiveTypeKind.Duration.getFullQualifiedName();
+			case "json":
+			case "jsonb":
+				return EdmPrimitiveTypeKind.String.getFullQualifiedName(); // JSON is treated as string
+			case "xml":
+				return EdmPrimitiveTypeKind.String.getFullQualifiedName(); // XML is also treated as string
+			case "point":
+			case "line":
+			case "lseg":
+			case "box":
+			case "path":
+			case "polygon":
+			case "circle":
+				return EdmPrimitiveTypeKind.Geometry.getFullQualifiedName(); // Geometric types as Geometry
+			case "cidr":
+			case "inet":
+			case "macaddr":
+			case "macaddr8":
+				return EdmPrimitiveTypeKind.String.getFullQualifiedName(); // Network addresses as string
+			case "bit":
+			case "bit varying":
+				return EdmPrimitiveTypeKind.Binary.getFullQualifiedName(); // Bit strings as binary
+			case "tsvector":
+			case "tsquery":
+				return EdmPrimitiveTypeKind.String.getFullQualifiedName(); // Text search types as string
 			default:
 				throw new IllegalArgumentException("Unsupported PostgreSQL type: " + postgresType);
 		}
 	}
+
+
 
 
 	private CsdlEntityContainer createEntityContainer(List<TableSchemaDTO> tableSchemas) {
@@ -205,6 +248,71 @@ public class CustomEdmProvider extends CsdlAbstractEdmProvider {
 			entitySets.add(entitySet);
 		}
 		container.setEntitySets(entitySets);
+		container.setActionImports(Collections.singletonList(defineResetActionImport()));
+		container.setFunctionImports(Collections.singletonList(defineGetAllFunctionImport()));
 		return container;
 	}
+	private CsdlAction defineResetAction() {
+		return new CsdlAction().setName("ResetDemo").setBound(false).setReturnType(new CsdlReturnType().setType(EdmPrimitiveTypeKind.Boolean.getFullQualifiedName()));
+	}
+
+	private CsdlFunction defineGetAllFunction() {
+		// 반환하려는 엔티티 타입의 FullQualifiedName을 가정합니다. 여기서는 'Person'으로 가정
+		FullQualifiedName entityTypeFQN = new FullQualifiedName("OData.framework", "member");
+
+		CsdlReturnType returnType = new CsdlReturnType()
+				.setCollection(true)
+				.setType(entityTypeFQN);
+
+		return new CsdlFunction()
+				.setName("GetAllEntities")
+				.setBound(false)
+				.setReturnType(returnType);
+	}
+
+
+	private CsdlActionImport defineResetActionImport() {
+		return new CsdlActionImport()
+				.setName("ResetDemo")
+				.setAction(ACTION_RESET);
+	}
+
+	private CsdlFunctionImport defineGetAllFunctionImport() {
+		return new CsdlFunctionImport()
+				.setName("GetAllEntities")
+				.setFunction(FUNCTION_GET_ALL);
+	}
+
+	@Override
+	public List<CsdlAction> getActions(FullQualifiedName actionName) throws ODataException {
+		if (ACTION_RESET.equals(actionName)) {
+			return Collections.singletonList(defineResetAction());
+		}
+		return null;
+	}
+
+	@Override
+	public List<CsdlFunction> getFunctions(FullQualifiedName functionName) throws ODataException {
+		if (FUNCTION_GET_ALL.equals(functionName)) {
+			return Collections.singletonList(defineGetAllFunction());
+		}
+		return null;
+	}
+
+	@Override
+	public CsdlActionImport getActionImport(FullQualifiedName entityContainer, String actionImportName) throws ODataException {
+		if ("ResetDemo".equals(actionImportName)) {
+			return defineResetActionImport();
+		}
+		return null;
+	}
+
+	@Override
+	public CsdlFunctionImport getFunctionImport(FullQualifiedName entityContainer, String functionImportName) throws ODataException {
+		if ("GetAllEntities".equals(functionImportName)) {
+			return defineGetAllFunctionImport();
+		}
+		return null;
+	}
+
 }

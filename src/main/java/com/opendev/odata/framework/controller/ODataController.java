@@ -1,12 +1,13 @@
 package com.opendev.odata.framework.controller;
 
+import com.opendev.odata.framework.service.CustomActionProcessor;
+import com.opendev.odata.framework.service.CustomEntityCollectionProcessor;
+import com.opendev.odata.framework.service.CustomEntityProcessor;
 import lombok.RequiredArgsConstructor;
 import org.apache.olingo.commons.api.edm.provider.CsdlEdmProvider;
 import org.apache.olingo.server.api.OData;
 import org.apache.olingo.server.api.ODataHttpHandler;
 import org.apache.olingo.server.api.ServiceMetadata;
-import org.apache.olingo.server.api.processor.EntityCollectionProcessor;
-import org.apache.olingo.server.api.processor.EntityProcessor;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -27,21 +28,24 @@ public class ODataController {
 	protected static final String URI = "/OData/V1.0";
 
 	
-	private final CsdlEdmProvider edmProvider;
-	
-	
-	private final EntityCollectionProcessor processor;
-	
-	private final EntityProcessor  entityProcessor;
+	private final CsdlEdmProvider csdlEdmProvider;
+
+	private final CustomActionProcessor customActionProcessor;
+
+	private final CustomEntityCollectionProcessor customEntityCollectionProcessor;
+
+	private final CustomEntityProcessor customEntityProcessor;
+
 
 	@RequestMapping(value = "*")
 	public void process(HttpServletRequest request, HttpServletResponse response) {
 		OData odata = OData.newInstance();
-		ServiceMetadata edm = odata.createServiceMetadata(edmProvider,
+		ServiceMetadata edm = odata.createServiceMetadata(csdlEdmProvider,
 				new ArrayList<>());
 		ODataHttpHandler handler = odata.createHandler(edm);
-		handler.register(processor);
-		handler.register(entityProcessor);
+		handler.register(customEntityCollectionProcessor);
+		handler.register(customEntityProcessor);
+		handler.register(customActionProcessor);
 		handler.process(new HttpServletRequestWrapper(request) {
 			// Spring MVC matches the whole path as the servlet path
 			// Olingo wants just the prefix, ie upto /OData/V1.0, so that it

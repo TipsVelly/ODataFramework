@@ -33,7 +33,7 @@ import java.util.Map;
 
 @Component
 @RequiredArgsConstructor
-public class CustomeEntityProcessor implements EntityProcessor {
+public class CustomEntityProcessor implements EntityProcessor {
 
     private OData odata;
     private ServiceMetadata serviceMetadata;
