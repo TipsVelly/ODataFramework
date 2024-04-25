@@ -24,7 +24,7 @@ public class CustomEdmProvider extends CsdlAbstractEdmProvider {
 
 
 	private static final FullQualifiedName ACTION_RESET = new FullQualifiedName("OData.framework", "ResetDemo");
-	private static final FullQualifiedName FUNCTION_GET_ALL = new FullQualifiedName("OData.framework", "GetAllEntities");
+	private static final FullQualifiedName FUNCTION_CALCULATE_VAT = new FullQualifiedName("OData.framework", "CalculateVAT");
 
 
 	@Override
@@ -45,7 +45,8 @@ public class CustomEdmProvider extends CsdlAbstractEdmProvider {
 		schema.setEntityTypes(entityTypes);
 
 		schema.setActions(Collections.singletonList(defineResetAction()));
-		schema.setFunctions(Collections.singletonList(defineGetAllFunction()));
+		schema.setFunctions(Collections.singletonList(defineCalculateVATFunction()));
+
 
 
 		schema.setEntityContainer(createEntityContainer(tableSchemas));
@@ -249,25 +250,16 @@ public class CustomEdmProvider extends CsdlAbstractEdmProvider {
 		}
 		container.setEntitySets(entitySets);
 		container.setActionImports(Collections.singletonList(defineResetActionImport()));
-		container.setFunctionImports(Collections.singletonList(defineGetAllFunctionImport()));
+		List<CsdlFunctionImport> functionImports = new ArrayList<>();
+		functionImports.add(new CsdlFunctionImport()
+				.setName("StaticCalculateVAT")
+				.setFunction(FUNCTION_CALCULATE_VAT)
+				.setIncludeInServiceDocument(true));
+		container.setFunctionImports(functionImports);
 		return container;
 	}
 	private CsdlAction defineResetAction() {
 		return new CsdlAction().setName("ResetDemo").setBound(false).setReturnType(new CsdlReturnType().setType(EdmPrimitiveTypeKind.Boolean.getFullQualifiedName()));
-	}
-
-	private CsdlFunction defineGetAllFunction() {
-		// 반환하려는 엔티티 타입의 FullQualifiedName을 가정합니다. 여기서는 'Person'으로 가정
-		FullQualifiedName entityTypeFQN = new FullQualifiedName("OData.framework", "member");
-
-		CsdlReturnType returnType = new CsdlReturnType()
-				.setCollection(true)
-				.setType(entityTypeFQN);
-
-		return new CsdlFunction()
-				.setName("GetAllEntities")
-				.setBound(false)
-				.setReturnType(returnType);
 	}
 
 
@@ -277,11 +269,6 @@ public class CustomEdmProvider extends CsdlAbstractEdmProvider {
 				.setAction(ACTION_RESET);
 	}
 
-	private CsdlFunctionImport defineGetAllFunctionImport() {
-		return new CsdlFunctionImport()
-				.setName("GetAllEntities")
-				.setFunction(FUNCTION_GET_ALL);
-	}
 
 	@Override
 	public List<CsdlAction> getActions(FullQualifiedName actionName) throws ODataException {
@@ -293,15 +280,15 @@ public class CustomEdmProvider extends CsdlAbstractEdmProvider {
 
 	@Override
 	public List<CsdlFunction> getFunctions(FullQualifiedName functionName) throws ODataException {
-		if (FUNCTION_GET_ALL.equals(functionName)) {
-			return Collections.singletonList(defineGetAllFunction());
+		if (FUNCTION_CALCULATE_VAT.equals(functionName)) {
+			return Collections.singletonList(defineCalculateVATFunction());
 		}
 		return null;
 	}
 
 	@Override
 	public CsdlActionImport getActionImport(FullQualifiedName entityContainer, String actionImportName) throws ODataException {
-		if ("ResetDemo".equals(actionImportName)) {
+		if (actionImportName.equals(ACTION_RESET.getName())) {
 			return defineResetActionImport();
 		}
 		return null;
@@ -309,10 +296,25 @@ public class CustomEdmProvider extends CsdlAbstractEdmProvider {
 
 	@Override
 	public CsdlFunctionImport getFunctionImport(FullQualifiedName entityContainer, String functionImportName) throws ODataException {
-		if ("GetAllEntities".equals(functionImportName)) {
-			return defineGetAllFunctionImport();
+		if ("Container".equals(entityContainer.getName()) && "StaticCalculateVAT".equals(functionImportName)) {
+			return new CsdlFunctionImport()
+					.setName(functionImportName)
+					.setFunction(FUNCTION_CALCULATE_VAT)
+					.setIncludeInServiceDocument(true);
 		}
 		return null;
+	}
+
+	public CsdlFunction defineCalculateVATFunction() {
+		CsdlParameter netPrice = new CsdlParameter().setName("NetPrice").setType(EdmPrimitiveTypeKind.Decimal.getFullQualifiedName()).setNullable(false);
+		CsdlParameter country = new CsdlParameter().setName("Country").setType(EdmPrimitiveTypeKind.String.getFullQualifiedName()).setNullable(false);
+
+		CsdlReturnType returnType = new CsdlReturnType().setType(EdmPrimitiveTypeKind.Decimal.getFullQualifiedName());
+
+		return new CsdlFunction()
+				.setName("CalculateVAT")
+				.setParameters(Arrays.asList(netPrice, country))
+				.setReturnType(returnType);
 	}
 
 }

@@ -3,6 +3,7 @@ package com.opendev.odata.framework.controller;
 import com.opendev.odata.framework.service.CustomActionProcessor;
 import com.opendev.odata.framework.service.CustomEntityCollectionProcessor;
 import com.opendev.odata.framework.service.CustomEntityProcessor;
+import com.opendev.odata.framework.service.CustomPrimitiveProcessor;
 import lombok.RequiredArgsConstructor;
 import org.apache.olingo.commons.api.edm.provider.CsdlEdmProvider;
 import org.apache.olingo.server.api.OData;
@@ -36,6 +37,7 @@ public class ODataController {
 
 	private final CustomEntityProcessor customEntityProcessor;
 
+	private final CustomPrimitiveProcessor customPrimitiveProcessor;
 
 	@RequestMapping(value = "*")
 	public void process(HttpServletRequest request, HttpServletResponse response) {
@@ -46,6 +48,7 @@ public class ODataController {
 		handler.register(customEntityCollectionProcessor);
 		handler.register(customEntityProcessor);
 		handler.register(customActionProcessor);
+		handler.register(customPrimitiveProcessor);
 		handler.process(new HttpServletRequestWrapper(request) {
 			// Spring MVC matches the whole path as the servlet path
 			// Olingo wants just the prefix, ie upto /OData/V1.0, so that it
