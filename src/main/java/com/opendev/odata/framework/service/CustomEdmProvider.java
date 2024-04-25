@@ -1,5 +1,8 @@
 package com.opendev.odata.framework.service;
 
+import com.opendev.odata.domain.query.entity.TdxQuery;
+import com.opendev.odata.domain.query.repository.QueryParamRepository;
+import com.opendev.odata.domain.query.repository.QueryRepository;
 import com.opendev.odata.domain.table.dto.TableSchemaDTO;
 import com.opendev.odata.framework.mapper.CustomJpaRepository;
 import com.opendev.odata.framework.mapper.EdmProviderMapper;
@@ -13,6 +16,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -21,7 +25,8 @@ public class CustomEdmProvider extends CsdlAbstractEdmProvider {
 	private final DatabaseMetadataService databaseMetadataService;
 	private final EdmProviderMapper edmProviderMapper;
 	private final CustomJpaRepository  customJpaRepository;
-
+	private final QueryRepository queryRepository;
+	private final QueryParamRepository queryParamRepository;
 
 	private static final FullQualifiedName ACTION_RESET = new FullQualifiedName("OData.framework", "ResetDemo");
 	private static final FullQualifiedName FUNCTION_CALCULATE_VAT = new FullQualifiedName("OData.framework", "CalculateVAT");
@@ -41,11 +46,13 @@ public class CustomEdmProvider extends CsdlAbstractEdmProvider {
 		for (TableSchemaDTO tableSchema : tableSchemas) {
 			entityTypes.add(createCsdlEntityType(tableSchema));
 		}
+		List<CsdlAction> actions = loadDynamicActions();
+		List<CsdlFunction> functions = loadDynamicFunctions();
 
 		schema.setEntityTypes(entityTypes);
 
-		schema.setActions(Collections.singletonList(defineResetAction()));
-		schema.setFunctions(Collections.singletonList(defineCalculateVATFunction()));
+		schema.setActions(actions);
+		schema.setFunctions(functions);
 
 
 
@@ -125,9 +132,34 @@ public class CustomEdmProvider extends CsdlAbstractEdmProvider {
 	public CsdlEntityContainer getEntityContainer() throws ODataException {
 		CsdlEntityContainer container = new CsdlEntityContainer();
 		container.setName("Container");
+
+		// 엔티티 세트 추가
 		container.setEntitySets(new ArrayList<>(getEntitySets().values()));
+
+		// 동적 액션 및 펑션 로드
+		List<CsdlAction> actions = loadDynamicActions();
+		List<CsdlFunction> functions = loadDynamicFunctions();
+
+		// 동적 액션 임포트 추가
+		List<CsdlActionImport> actionImports = actions.stream()
+				.map(action -> new CsdlActionImport()
+						.setName(action.getName())
+						.setAction(new FullQualifiedName("OData.framework", action.getName())))
+				.collect(Collectors.toList());
+		container.setActionImports(actionImports);
+
+		// 동적 펑션 임포트 추가
+		List<CsdlFunctionImport> functionImports = functions.stream()
+				.map(function -> new CsdlFunctionImport()
+						.setName(function.getName())
+						.setFunction(new FullQualifiedName("OData.framework", function.getName()))
+						.setIncludeInServiceDocument(true))
+				.collect(Collectors.toList());
+		container.setFunctionImports(functionImports);
+
 		return container;
 	}
+
 
 	@Override
 	public CsdlEntityContainerInfo getEntityContainerInfo(FullQualifiedName entityContainerName) throws ODataException {
@@ -249,15 +281,27 @@ public class CustomEdmProvider extends CsdlAbstractEdmProvider {
 			entitySets.add(entitySet);
 		}
 		container.setEntitySets(entitySets);
-		container.setActionImports(Collections.singletonList(defineResetActionImport()));
-		List<CsdlFunctionImport> functionImports = new ArrayList<>();
-		functionImports.add(new CsdlFunctionImport()
-				.setName("StaticCalculateVAT")
-				.setFunction(FUNCTION_CALCULATE_VAT)
-				.setIncludeInServiceDocument(true));
+
+		// 동적으로 생성된 액션과 펑션을 사용하여 액션 임포트와 펑션 임포트 리스트를 생성
+		List<CsdlActionImport> actionImports = loadDynamicActions().stream()
+				.map(action -> new CsdlActionImport()
+						.setName(action.getName())
+						.setAction(new FullQualifiedName("OData.framework", action.getName())))
+				.collect(Collectors.toList());
+		List<CsdlFunctionImport> functionImports = loadDynamicFunctions().stream()
+				.map(function -> new CsdlFunctionImport()
+						.setName(function.getName())
+						.setFunction(new FullQualifiedName("OData.framework", function.getName()))
+						.setIncludeInServiceDocument(true))
+				.collect(Collectors.toList());
+
+		// 설정된 액션 임포트와 펑션 임포트를 컨테이너에 추가
+		container.setActionImports(actionImports);
 		container.setFunctionImports(functionImports);
+
 		return container;
 	}
+
 	private CsdlAction defineResetAction() {
 		return new CsdlAction().setName("ResetDemo").setBound(false).setReturnType(new CsdlReturnType().setType(EdmPrimitiveTypeKind.Boolean.getFullQualifiedName()));
 	}
@@ -268,42 +312,49 @@ public class CustomEdmProvider extends CsdlAbstractEdmProvider {
 				.setName("ResetDemo")
 				.setAction(ACTION_RESET);
 	}
-
-
 	@Override
-	public List<CsdlAction> getActions(FullQualifiedName actionName) throws ODataException {
-		if (ACTION_RESET.equals(actionName)) {
-			return Collections.singletonList(defineResetAction());
-		}
-		return null;
+	public List<CsdlAction> getActions(FullQualifiedName actionName) {
+		// 데이터베이스에서 로드된 액션을 반환
+		return queryRepository.findAll().stream()
+				.filter(query -> new FullQualifiedName("OData.framework", query.getOdataQueryName()).equals(actionName))
+				.map(this::convertToCsdlAction)
+				.collect(Collectors.toList());
 	}
 
 	@Override
-	public List<CsdlFunction> getFunctions(FullQualifiedName functionName) throws ODataException {
-		if (FUNCTION_CALCULATE_VAT.equals(functionName)) {
-			return Collections.singletonList(defineCalculateVATFunction());
-		}
-		return null;
+	public List<CsdlFunction> getFunctions(FullQualifiedName functionName) {
+		// 데이터베이스에서 로드된 펑션을 반환
+		return queryRepository.findAll().stream()
+				.filter(query -> new FullQualifiedName("OData.framework", query.getOdataQueryName()).equals(functionName))
+				.map(this::convertToCsdlFunction)
+				.collect(Collectors.toList());
 	}
 
 	@Override
-	public CsdlActionImport getActionImport(FullQualifiedName entityContainer, String actionImportName) throws ODataException {
-		if (actionImportName.equals(ACTION_RESET.getName())) {
-			return defineResetActionImport();
-		}
-		return null;
+	public CsdlActionImport getActionImport(FullQualifiedName entityContainer, String actionImportName) {
+		// 동적으로 생성된 액션 임포트를 반환
+		Optional<CsdlAction> action = loadDynamicActions().stream()
+				.filter(a -> a.getName().equals(actionImportName))
+				.findFirst();
+		return action.map(a -> new CsdlActionImport()
+						.setName(actionImportName)
+						.setAction(new FullQualifiedName("OData.framework", actionImportName)))
+				.orElse(null);
 	}
 
 	@Override
-	public CsdlFunctionImport getFunctionImport(FullQualifiedName entityContainer, String functionImportName) throws ODataException {
-		if ("Container".equals(entityContainer.getName()) && "StaticCalculateVAT".equals(functionImportName)) {
-			return new CsdlFunctionImport()
-					.setName(functionImportName)
-					.setFunction(FUNCTION_CALCULATE_VAT)
-					.setIncludeInServiceDocument(true);
-		}
-		return null;
+	public CsdlFunctionImport getFunctionImport(FullQualifiedName entityContainer, String functionImportName) {
+		// 동적으로 생성된 펑션 임포트를 반환
+		Optional<CsdlFunction> function = loadDynamicFunctions().stream()
+				.filter(f -> f.getName().equals(functionImportName))
+				.findFirst();
+		return function.map(f -> new CsdlFunctionImport()
+						.setName(functionImportName)
+						.setFunction(new FullQualifiedName("OData.framework", functionImportName))
+						.setIncludeInServiceDocument(true))
+				.orElse(null);
 	}
+
 
 	public CsdlFunction defineCalculateVATFunction() {
 		CsdlParameter netPrice = new CsdlParameter().setName("NetPrice").setType(EdmPrimitiveTypeKind.Decimal.getFullQualifiedName()).setNullable(false);
@@ -315,6 +366,38 @@ public class CustomEdmProvider extends CsdlAbstractEdmProvider {
 				.setName("CalculateVAT")
 				.setParameters(Arrays.asList(netPrice, country))
 				.setReturnType(returnType);
+	}
+
+	private List<CsdlAction> loadDynamicActions() {
+		return queryRepository.findAll().stream()
+				.filter(query -> query.getHttpRequest().equals("POST")) // Assuming POST for Actions
+				.map(this::convertToCsdlAction)
+				.collect(Collectors.toList());
+	}
+
+	private CsdlAction convertToCsdlAction(TdxQuery query) {
+		return new CsdlAction()
+				.setName(query.getOdataQueryName())
+				.setBound(false)
+				.setReturnType(new CsdlReturnType().setType(EdmPrimitiveTypeKind.String.getFullQualifiedName()));
+	}
+
+	private List<CsdlFunction> loadDynamicFunctions() {
+		return queryRepository.findAll().stream()
+				.filter(query -> "GET".equals(query.getHttpRequest()))
+				.map(this::convertToCsdlFunction)
+				.collect(Collectors.toList());
+	}
+
+	private CsdlFunction convertToCsdlFunction(TdxQuery query) {
+		List<CsdlParameter> parameters = queryParamRepository.findByTdxQuery(query).stream()
+				.map(param -> new CsdlParameter().setName(param.getParameter()).setType(EdmPrimitiveTypeKind.String.getFullQualifiedName()))
+				.collect(Collectors.toList());
+
+		return new CsdlFunction()
+				.setName(query.getOdataQueryName())
+				.setParameters(parameters)
+				.setReturnType(new CsdlReturnType().setType(EdmPrimitiveTypeKind.String.getFullQualifiedName()));
 	}
 
 }

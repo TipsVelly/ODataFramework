@@ -12,6 +12,8 @@ public class QueryWithIdDto {
     private Long id;
     private String title;
     private String query;
+    private String httpRequest;
+    private String odataQueryName;
     private List<QueryParamDto> parameters;
 
     public static QueryWithIdDto fromEntity(TdxQuery tdxQuery) {
@@ -19,6 +21,8 @@ public class QueryWithIdDto {
         queryWithIdDtoDTO.setId(tdxQuery.getId());
         queryWithIdDtoDTO.setTitle(tdxQuery.getTitle());
         queryWithIdDtoDTO.setQuery(tdxQuery.getQuery());
+        queryWithIdDtoDTO.setHttpRequest(tdxQuery.getHttpRequest());
+        queryWithIdDtoDTO.setOdataQueryName(tdxQuery.getOdataQueryName());
 
         List<TdxQueryParam> params = tdxQuery.getTdxQueryParams();
         queryWithIdDtoDTO.setParameters(params.stream()

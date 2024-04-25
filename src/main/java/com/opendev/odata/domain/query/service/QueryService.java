@@ -25,6 +25,8 @@ public class QueryService {
         TdxQuery tdxQuery = TdxQuery.builder()
                 .title(queryDto.getTitle())
                 .query(queryDto.getQuery())
+                .httpRequest(queryDto.getHttpRequest())
+                .odataQueryName(queryDto.getOdataQueryName())
                 .build();
         TdxQuery savedQuery = queryRepository.save(tdxQuery);
 
@@ -88,7 +90,7 @@ public class QueryService {
         TdxQuery tdxQuery = queryRepository.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("TdxQuery not found. ID: " + id));
 
-        tdxQuery.updateTitleAndQuery(queryWithIdDto.getTitle(), queryWithIdDto.getQuery());
+        tdxQuery.updateTitleAndQuery(queryWithIdDto.getTitle(), queryWithIdDto.getQuery(), queryWithIdDto.getHttpRequest(), queryWithIdDto.getOdataQueryName());
 
         List<TdxQueryParam> newParams = queryWithIdDto.getParameters().stream()
                 .map(QueryParamDto::toEntity)

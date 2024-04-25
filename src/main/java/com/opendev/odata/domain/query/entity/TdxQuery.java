@@ -27,10 +27,19 @@ public class TdxQuery {
 
     @OneToMany(mappedBy = "tdxQuery", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<TdxQueryParam> tdxQueryParams = new ArrayList<>();
+
+    private String httpRequest;
+
+    private String odataQueryName;
+
+
     // 비즈니스 로직으로 상태 변경
-    public void updateTitleAndQuery(String title, String query) {
+    public void updateTitleAndQuery(String title, String query, String httpRequest, String odataQueryName) {
         this.title = title;
         this.query = query;
+        this.httpRequest = httpRequest;
+        this.odataQueryName = odataQueryName;
+
     }
 
     public void updateParameters(List<TdxQueryParam> newParams) {

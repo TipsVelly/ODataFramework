@@ -8,5 +8,7 @@ import java.util.List;
 public class QueryDto {
     private String title;
     private String query;
+    private String httpRequest;
+    private String odataQueryName;
     private List<QueryParamDto> parameters;
 }
