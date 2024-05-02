@@ -1,31 +1,50 @@
 package com.opendev.odata.framework.service;
 
-import org.apache.olingo.commons.api.data.Entity;
-import org.apache.olingo.commons.api.data.Property;
-import org.apache.olingo.commons.api.edm.EdmPrimitiveType;
+import com.opendev.odata.domain.query.entity.TdxQuery;
+import com.opendev.odata.domain.query.entity.TdxQueryParam;
+import com.opendev.odata.domain.query.repository.QueryParamRepository;
+import com.opendev.odata.domain.query.repository.QueryRepository;
+import lombok.RequiredArgsConstructor;
+import org.apache.olingo.commons.api.data.*;
+import org.apache.olingo.commons.api.edm.EdmEntityType;
+import org.apache.olingo.commons.api.edm.FullQualifiedName;
 import org.apache.olingo.commons.api.format.ContentType;
+import org.apache.olingo.commons.api.http.HttpHeader;
 import org.apache.olingo.commons.api.http.HttpStatusCode;
 import org.apache.olingo.server.api.*;
 import org.apache.olingo.server.api.processor.PrimitiveCollectionProcessor;
 import org.apache.olingo.server.api.processor.PrimitiveProcessor;
 import org.apache.olingo.server.api.processor.PrimitiveValueProcessor;
+import org.apache.olingo.server.api.serializer.EntityCollectionSerializerOptions;
 import org.apache.olingo.server.api.serializer.ODataSerializer;
-import org.apache.olingo.server.api.serializer.PrimitiveSerializerOptions;
+import org.apache.olingo.server.api.serializer.SerializerException;
 import org.apache.olingo.server.api.serializer.SerializerResult;
 import org.apache.olingo.server.api.uri.UriInfo;
 import org.apache.olingo.server.api.uri.UriParameter;
-import org.apache.olingo.server.api.uri.UriResourceEntitySet;
-import org.apache.olingo.server.api.uri.UriResourcePrimitiveProperty;
+import org.apache.olingo.server.api.uri.UriResource;
+import org.apache.olingo.server.api.uri.UriResourceFunction;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Component
+@RequiredArgsConstructor
 public class CustomPrimitiveProcessor implements PrimitiveProcessor, PrimitiveValueProcessor, PrimitiveCollectionProcessor {
 
     private OData odata;
     private ServiceMetadata serviceMetadata;
+
+    private final QueryRepository queryRepository;
+
+    private final QueryParamRepository queryParamRepository;
+
+    private final NamedParameterJdbcTemplate jdbcTemplate;
+
 
     @Override
     public void init(OData oData, ServiceMetadata serviceMetadata) {
@@ -35,36 +54,81 @@ public class CustomPrimitiveProcessor implements PrimitiveProcessor, PrimitiveVa
 
     @Override
     public void readPrimitive(ODataRequest request, ODataResponse response, UriInfo uriInfo, ContentType responseFormat) throws ODataApplicationException, ODataLibraryException {
-        // Retrieve the entity set and key from the first URI part
-        UriResourceEntitySet entitySetResource = (UriResourceEntitySet) uriInfo.getUriResourceParts().get(0);
-        List<UriParameter> keyPredicates = entitySetResource.getKeyPredicates();
+        UriResourceFunction uriResourceFunction = extractFunctionFromUri(uriInfo);
+        TdxQuery tdxQuery = queryRepository.findByODataQueryName(uriResourceFunction.getFunction().getName());
 
-        // Retrieve the target property from the second URI part
-        UriResourcePrimitiveProperty uriProperty = (UriResourcePrimitiveProperty) uriInfo.getUriResourceParts().get(1);
-        EdmPrimitiveType propertyType = (EdmPrimitiveType) uriProperty.getProperty().getType();
-
-        // Find the entity based on the key
-        Entity entity = findEntityByKey(entitySetResource.getEntitySet().getName(), keyPredicates);
-        if (entity == null) {
-            throw new ODataApplicationException("Entity not found", HttpStatusCode.NOT_FOUND.getStatusCode(), Locale.ENGLISH);
+        if (tdxQuery == null) {
+            throw new ODataApplicationException("Function not found",
+                    HttpStatusCode.NOT_FOUND.getStatusCode(), Locale.ENGLISH);
         }
 
-        // Find the property within the entity
-        Property property = entity.getProperty(uriProperty.getProperty().getName());
-        if (property == null) {
-            throw new ODataApplicationException("Property not found", HttpStatusCode.NOT_FOUND.getStatusCode(), Locale.ENGLISH);
+
+        List<Map<String, Object>> result = executeQuery(resolveAndExecuteQuery(uriResourceFunction.getParameters(), tdxQuery));
+        serializeResult(result, response, responseFormat);
+    }
+
+    private UriResourceFunction extractFunctionFromUri(UriInfo uriInfo) throws ODataApplicationException {
+        UriResource firstSegment = uriInfo.getUriResourceParts().get(0);
+        if (!(firstSegment instanceof UriResourceFunction)) {
+            throw new ODataApplicationException("Invalid function call",
+                    HttpStatusCode.BAD_REQUEST.getStatusCode(), Locale.ENGLISH);
         }
+        return (UriResourceFunction) firstSegment;
+    }
 
-        // Serialize the property
-        ODataSerializer serializer = this.odata.createSerializer(responseFormat);
-        PrimitiveSerializerOptions options = PrimitiveSerializerOptions.with().build();
-        SerializerResult serializerResult = serializer.primitive(serviceMetadata, propertyType, property, options);
+    private String resolveAndExecuteQuery(List<UriParameter> uriParameters, TdxQuery tdxQuery) {
+        // 매핑된 쿼리 파라미터를 추출하여 Map으로 변환
+        Map<String, String> queryParamMap = tdxQuery.getTdxQueryParams().stream()
+                .collect(Collectors.toMap(
+                        param -> param.getParameter().replace(":", ""), // URI 파라미터에서 ':' 제거
+                        TdxQueryParam::getAttribute, // DB에 매핑된 실제 속성 이름
+                        (oldValue, newValue) -> oldValue // 중복 키가 있는 경우 이전 값을 유지
+                ));
 
-        // Configure the response
+        String resolvedQuery = tdxQuery.getQuery();
+        // URI 파라미터를 반복하여 쿼리 문자열 내의 해당 파라미터를 실제 값으로 치환
+        for (UriParameter uriParam : uriParameters) {
+            String paramName = uriParam.getName();
+            if (queryParamMap.containsKey(paramName)) {
+                resolvedQuery = resolvedQuery.replace(":" + paramName, uriParam.getText());
+            } else {
+                System.out.println("Parameter not found in queryParamMap: " + paramName);
+            }
+        }
+        return resolvedQuery;
+    }
+
+
+
+    public List<Map<String, Object>> executeQuery(String query) {
+        // Execute the query directly without explicitly passing parameters
+        return jdbcTemplate.queryForList(query, new MapSqlParameterSource());
+    }
+
+    private void serializeResult(List<Map<String, Object>> result, ODataResponse response, ContentType responseFormat) throws SerializerException {
+        EntityCollection entityCollection = new EntityCollection();
+        result.forEach(row -> {
+            Entity entity = new Entity();
+            row.forEach((key, value) -> entity.addProperty(new Property(null, key, ValueType.PRIMITIVE, value)));
+            entityCollection.getEntities().add(entity);
+        });
+        final String id = "test";
+        // Static definition of EdmEntityType and ContextURL
+        ContextURL contextURL = ContextURL.with().entitySetOrSingletonOrType("products").build();
+        EntityCollectionSerializerOptions opts = EntityCollectionSerializerOptions.with().id(id).contextURL(contextURL).build();
+
+        EdmEntityType edmEntityType = serviceMetadata.getEdm().getEntityType(new FullQualifiedName("OData.framework", "products"));
+
+        ODataSerializer serializer = odata.createSerializer(responseFormat);
+        SerializerResult serializerResult = serializer.entityCollection(serviceMetadata, edmEntityType, entityCollection, opts);
+
         response.setContent(serializerResult.getContent());
         response.setStatusCode(HttpStatusCode.OK.getStatusCode());
-        response.setHeader("Content-Type", responseFormat.toContentTypeString());
+        response.setHeader(HttpHeader.CONTENT_TYPE, responseFormat.toContentTypeString());
     }
+
+
+
 
     @Override
     public void updatePrimitive(ODataRequest request, ODataResponse response, UriInfo uriInfo, ContentType requestFormat, ContentType responseFormat) throws ODataApplicationException, ODataLibraryException {

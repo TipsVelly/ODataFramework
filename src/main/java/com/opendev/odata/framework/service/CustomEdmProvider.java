@@ -1,6 +1,7 @@
 package com.opendev.odata.framework.service;
 
 import com.opendev.odata.domain.query.entity.TdxQuery;
+import com.opendev.odata.domain.query.entity.TdxQueryParam;
 import com.opendev.odata.domain.query.repository.QueryParamRepository;
 import com.opendev.odata.domain.query.repository.QueryRepository;
 import com.opendev.odata.domain.table.dto.TableSchemaDTO;
@@ -268,9 +269,6 @@ public class CustomEdmProvider extends CsdlAbstractEdmProvider {
 		}
 	}
 
-
-
-
 	private CsdlEntityContainer createEntityContainer(List<TableSchemaDTO> tableSchemas) {
 		CsdlEntityContainer container = new CsdlEntityContainer().setName("Container");
 		List<CsdlEntitySet> entitySets = new ArrayList<>();
@@ -302,16 +300,6 @@ public class CustomEdmProvider extends CsdlAbstractEdmProvider {
 		return container;
 	}
 
-	private CsdlAction defineResetAction() {
-		return new CsdlAction().setName("ResetDemo").setBound(false).setReturnType(new CsdlReturnType().setType(EdmPrimitiveTypeKind.Boolean.getFullQualifiedName()));
-	}
-
-
-	private CsdlActionImport defineResetActionImport() {
-		return new CsdlActionImport()
-				.setName("ResetDemo")
-				.setAction(ACTION_RESET);
-	}
 	@Override
 	public List<CsdlAction> getActions(FullQualifiedName actionName) {
 		// 데이터베이스에서 로드된 액션을 반환
@@ -355,19 +343,6 @@ public class CustomEdmProvider extends CsdlAbstractEdmProvider {
 				.orElse(null);
 	}
 
-
-	public CsdlFunction defineCalculateVATFunction() {
-		CsdlParameter netPrice = new CsdlParameter().setName("NetPrice").setType(EdmPrimitiveTypeKind.Decimal.getFullQualifiedName()).setNullable(false);
-		CsdlParameter country = new CsdlParameter().setName("Country").setType(EdmPrimitiveTypeKind.String.getFullQualifiedName()).setNullable(false);
-
-		CsdlReturnType returnType = new CsdlReturnType().setType(EdmPrimitiveTypeKind.Decimal.getFullQualifiedName());
-
-		return new CsdlFunction()
-				.setName("CalculateVAT")
-				.setParameters(Arrays.asList(netPrice, country))
-				.setReturnType(returnType);
-	}
-
 	private List<CsdlAction> loadDynamicActions() {
 		return queryRepository.findAll().stream()
 				.filter(query -> query.getHttpRequest().equals("POST")) // Assuming POST for Actions
@@ -389,14 +364,24 @@ public class CustomEdmProvider extends CsdlAbstractEdmProvider {
 				.collect(Collectors.toList());
 	}
 
+	// 새로 추가할 함수 정의 메서드
 	private CsdlFunction convertToCsdlFunction(TdxQuery query) {
-		List<CsdlParameter> parameters = queryParamRepository.findByTdxQuery(query).stream()
-				.map(param -> new CsdlParameter().setName(param.getParameter()).setType(EdmPrimitiveTypeKind.String.getFullQualifiedName()))
-				.collect(Collectors.toList());
+		List<TdxQueryParam> queryParams = queryParamRepository.findByTdxQuery(query);
+		return generateFunction(query, queryParams);
+	}
 
+	private List<CsdlParameter> generateFunctionParameters(List<TdxQueryParam> queryParams) {
+		return queryParams.stream()
+				.map(param -> new CsdlParameter()
+						.setName(param.getParameter().replace(":", ""))  // ':' 제거
+						.setType(convertPostgresTypeToEdmType(param.getAttribute()))) // 데이터베이스 컬럼 타입을 OData EDM 타입으로 변환
+				.collect(Collectors.toList());
+	}
+
+	private CsdlFunction generateFunction(TdxQuery query, List<TdxQueryParam> queryParams) {
 		return new CsdlFunction()
 				.setName(query.getOdataQueryName())
-				.setParameters(parameters)
+				.setParameters(generateFunctionParameters(queryParams))
 				.setReturnType(new CsdlReturnType().setType(EdmPrimitiveTypeKind.String.getFullQualifiedName()));
 	}
 
