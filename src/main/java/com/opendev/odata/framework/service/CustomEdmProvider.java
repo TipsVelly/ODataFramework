@@ -29,10 +29,6 @@ public class CustomEdmProvider extends CsdlAbstractEdmProvider {
 	private final QueryRepository queryRepository;
 	private final QueryParamRepository queryParamRepository;
 
-	private static final FullQualifiedName ACTION_RESET = new FullQualifiedName("OData.framework", "ResetDemo");
-	private static final FullQualifiedName FUNCTION_CALCULATE_VAT = new FullQualifiedName("OData.framework", "CalculateVAT");
-
-
 	@Override
 	public List<CsdlSchema> getSchemas() throws ODataException {
 		List<CsdlSchema> schemas = new ArrayList<>();
@@ -384,5 +380,6 @@ public class CustomEdmProvider extends CsdlAbstractEdmProvider {
 				.setParameters(generateFunctionParameters(queryParams))
 				.setReturnType(new CsdlReturnType().setType(EdmPrimitiveTypeKind.String.getFullQualifiedName()));
 	}
+
 
 }
