@@ -5,10 +5,10 @@ import com.opendev.odata.domain.query.entity.TdxQueryParam;
 import com.opendev.odata.domain.query.repository.QueryParamRepository;
 import com.opendev.odata.domain.query.repository.QueryRepository;
 import lombok.RequiredArgsConstructor;
-import org.apache.olingo.commons.api.data.*;
-import org.apache.olingo.commons.api.edm.EdmEntitySet;
-import org.apache.olingo.commons.api.edm.EdmEntityType;
-import org.apache.olingo.commons.api.edm.FullQualifiedName;
+import org.apache.olingo.commons.api.data.Entity;
+import org.apache.olingo.commons.api.data.EntityCollection;
+import org.apache.olingo.commons.api.data.Property;
+import org.apache.olingo.commons.api.data.ValueType;
 import org.apache.olingo.commons.api.ex.ODataRuntimeException;
 import org.apache.olingo.commons.api.format.ContentType;
 import org.apache.olingo.commons.api.http.HttpHeader;
@@ -17,20 +17,23 @@ import org.apache.olingo.server.api.*;
 import org.apache.olingo.server.api.processor.PrimitiveCollectionProcessor;
 import org.apache.olingo.server.api.processor.PrimitiveProcessor;
 import org.apache.olingo.server.api.processor.PrimitiveValueProcessor;
-import org.apache.olingo.server.api.serializer.EntityCollectionSerializerOptions;
-import org.apache.olingo.server.api.serializer.ODataSerializer;
-import org.apache.olingo.server.api.serializer.SerializerResult;
 import org.apache.olingo.server.api.uri.*;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Component;
 
+import javax.json.Json;
+import javax.json.JsonArrayBuilder;
+import javax.json.JsonObjectBuilder;
+import javax.json.JsonWriter;
+import java.io.ByteArrayInputStream;
+import java.io.StringWriter;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
-
 @Component
 @RequiredArgsConstructor
 public class CustomPrimitiveProcessor implements PrimitiveProcessor, PrimitiveValueProcessor, PrimitiveCollectionProcessor {
@@ -43,6 +46,8 @@ public class CustomPrimitiveProcessor implements PrimitiveProcessor, PrimitiveVa
     private final QueryParamRepository queryParamRepository;
 
     private final NamedParameterJdbcTemplate jdbcTemplate;
+
+    private final CustomEdmProvider customEdmProvider;
 
 
     @Override
@@ -85,32 +90,27 @@ public class CustomPrimitiveProcessor implements PrimitiveProcessor, PrimitiveVa
             throw new ODataApplicationException("Entity collection is null or empty",
                     HttpStatusCode.NO_CONTENT.getStatusCode(), Locale.ENGLISH);
         }
-
         try {
             UriResource uriResource = uriInfo.getUriResourceParts().get(0);
-            String entitySetOrFunctionName;
-            EdmEntitySet edmEntitySet = null;  // Declare outside the if-else structure
-            if (uriResource instanceof UriResourceEntitySet) {
-                UriResourceEntitySet uriResourceEntitySet = (UriResourceEntitySet) uriResource;
-                entitySetOrFunctionName = uriResourceEntitySet.getEntitySet().getName();
-                edmEntitySet = uriResourceEntitySet.getEntitySet();
-            } else if (uriResource instanceof UriResourceFunction) {
-                UriResourceFunction uriResourceFunction = (UriResourceFunction) uriResource;
-                entitySetOrFunctionName = uriResourceFunction.getFunctionImport().getName();
-            } else {
-                throw new ODataApplicationException("Invalid URI segment type",
-                        HttpStatusCode.BAD_REQUEST.getStatusCode(), Locale.ENGLISH);
+            String entitySetOrFunctionName = getEntitySetOrFunctionName(uriResource);
+
+            JsonArrayBuilder jsonArrayBuilder = Json.createArrayBuilder();
+            for (Entity entity : entityCollection.getEntities()) {
+                JsonObjectBuilder jsonObjectBuilder = Json.createObjectBuilder();
+                for (Property property : entity.getProperties()) {
+                    jsonObjectBuilder.add(property.getName(), property.getValue() == null ? "" : property.getValue().toString()); // Null safety check
+                }
+                jsonArrayBuilder.add(jsonObjectBuilder);
             }
 
+            StringWriter stringWriter = new StringWriter();
 
-            ContextURL contextURL = ContextURL.with().entitySetOrSingletonOrType(entitySetOrFunctionName).build();
-            EntityCollectionSerializerOptions opts = EntityCollectionSerializerOptions.with().contextURL(contextURL).build();
-            EdmEntityType edmEntityType = serviceMetadata.getEdm().getEntityType(new FullQualifiedName("OData.framework", entitySetOrFunctionName));
-            System.out.println("serviceMetadata.getEdm()" + serviceMetadata.getEdm());
-            ODataSerializer serializer = odata.createSerializer(responseFormat);
-            SerializerResult serializerResult = serializer.entityCollection(serviceMetadata, edmEntityType, entityCollection, opts);
+            try (JsonWriter jsonWriter = Json.createWriter(stringWriter)) {
+                jsonWriter.writeArray(jsonArrayBuilder.build());
+            }
 
-            response.setContent(serializerResult.getContent());
+            byte[] jsonBytes = stringWriter.toString().getBytes(StandardCharsets.UTF_8);
+            response.setContent(new ByteArrayInputStream(jsonBytes));
             response.setStatusCode(HttpStatusCode.OK.getStatusCode());
             response.setHeader(HttpHeader.CONTENT_TYPE, responseFormat.toContentTypeString());
         } catch (Exception e) {
@@ -119,9 +119,16 @@ public class CustomPrimitiveProcessor implements PrimitiveProcessor, PrimitiveVa
         }
     }
 
-
-
-
+    private String getEntitySetOrFunctionName(UriResource uriResource) throws ODataApplicationException {
+        if (uriResource instanceof UriResourceEntitySet) {
+            return ((UriResourceEntitySet) uriResource).getEntitySet().getName();
+        } else if (uriResource instanceof UriResourceFunction) {
+            return ((UriResourceFunction) uriResource).getFunctionImport().getName();
+        } else {
+            throw new ODataApplicationException("Invalid URI segment type",
+                    HttpStatusCode.BAD_REQUEST.getStatusCode(), Locale.ENGLISH);
+        }
+    }
 
     private UriResourceFunction extractFunctionFromUri(UriInfo uriInfo) throws ODataApplicationException {
         UriResource firstSegment = uriInfo.getUriResourceParts().get(0);

@@ -47,14 +47,9 @@ public class CustomEdmProvider extends CsdlAbstractEdmProvider {
 		List<CsdlFunction> functions = loadDynamicFunctions();
 
 		schema.setEntityTypes(entityTypes);
-
 		schema.setActions(actions);
 		schema.setFunctions(functions);
-
-
-
 		schema.setEntityContainer(createEntityContainer(tableSchemas));
-
 		schemas.add(schema);
 		return schemas;
 	}

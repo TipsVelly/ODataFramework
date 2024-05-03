@@ -76,8 +76,7 @@ public class CustomEntityCollectionProcessor implements EntityCollectionProcesso
 		final String id = request.getRawBaseUri() + "/" + edmEntitySet.getName();
 		EntityCollectionSerializerOptions opts = EntityCollectionSerializerOptions.with().id(id).contextURL(contextUrl)
 				.build();
-		SerializerResult serializerResult = serializer.entityCollection(serviceMetadata, edmEntityType, entitySet,
-				opts);
+		SerializerResult serializerResult = serializer.entityCollection(serviceMetadata, edmEntityType, entitySet, opts);
 		InputStream serializedContent = serializerResult.getContent();
 
 		// Finally: configure the response object: set the body, headers and status code
