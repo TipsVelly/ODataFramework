@@ -90,23 +90,28 @@ public class CustomPrimitiveProcessor implements PrimitiveProcessor, PrimitiveVa
             throw new ODataApplicationException("Entity collection is null or empty",
                     HttpStatusCode.NO_CONTENT.getStatusCode(), Locale.ENGLISH);
         }
+
         try {
             UriResource uriResource = uriInfo.getUriResourceParts().get(0);
             String entitySetOrFunctionName = getEntitySetOrFunctionName(uriResource);
 
+            JsonObjectBuilder rootBuilder = Json.createObjectBuilder();
+            rootBuilder.add("@odata.context", "$metadata#" + entitySetOrFunctionName);
+
             JsonArrayBuilder jsonArrayBuilder = Json.createArrayBuilder();
             for (Entity entity : entityCollection.getEntities()) {
                 JsonObjectBuilder jsonObjectBuilder = Json.createObjectBuilder();
-                for (Property property : entity.getProperties()) {
-                    jsonObjectBuilder.add(property.getName(), property.getValue() == null ? "" : property.getValue().toString()); // Null safety check
-                }
+                entity.getProperties().forEach(property ->
+                        jsonObjectBuilder.add(property.getName(), property.getValue().toString())
+                );
                 jsonArrayBuilder.add(jsonObjectBuilder);
             }
 
-            StringWriter stringWriter = new StringWriter();
+            rootBuilder.add("value", jsonArrayBuilder);
 
+            StringWriter stringWriter = new StringWriter();
             try (JsonWriter jsonWriter = Json.createWriter(stringWriter)) {
-                jsonWriter.writeArray(jsonArrayBuilder.build());
+                jsonWriter.writeObject(rootBuilder.build());
             }
 
             byte[] jsonBytes = stringWriter.toString().getBytes(StandardCharsets.UTF_8);
