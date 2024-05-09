@@ -25,7 +25,7 @@ public class TdxQuery {
     @Column(columnDefinition = "TEXT")
     private String query;
 
-    @OneToMany(mappedBy = "tdxQuery", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "tdxQuery", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
     private List<TdxQueryParam> tdxQueryParams = new ArrayList<>();
 
     private String httpRequest;

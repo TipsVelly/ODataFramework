@@ -336,15 +336,19 @@ public class CustomEdmProvider extends CsdlAbstractEdmProvider {
 
 	private List<CsdlAction> loadDynamicActions() {
 		return queryRepository.findAll().stream()
-				.filter(query -> query.getHttpRequest().equals("POST")) // Assuming POST for Actions
+				.filter(query -> query.getHttpRequest().equals("POST")
+						|| query.getHttpRequest().equals("PUT")
+						|| query.getHttpRequest().equals("DELETE"))
 				.map(this::convertToCsdlAction)
 				.collect(Collectors.toList());
 	}
 
 	private CsdlAction convertToCsdlAction(TdxQuery query) {
+		List<TdxQueryParam> queryParams = queryParamRepository.findByTdxQuery(query);
 		return new CsdlAction()
 				.setName(query.getOdataQueryName())
 				.setBound(false)
+				.setParameters(generateActionParameters(queryParams))
 				.setReturnType(new CsdlReturnType().setType(EdmPrimitiveTypeKind.String.getFullQualifiedName()));
 	}
 
@@ -375,6 +379,12 @@ public class CustomEdmProvider extends CsdlAbstractEdmProvider {
 				.setParameters(generateFunctionParameters(queryParams))
 				.setReturnType(new CsdlReturnType().setType(EdmPrimitiveTypeKind.String.getFullQualifiedName()));
 	}
-
+	private List<CsdlParameter> generateActionParameters(List<TdxQueryParam> queryParams) {
+		return queryParams.stream()
+				.map(param -> new CsdlParameter()
+						.setName(param.getParameter().replace(":", ""))  // ':' 제거
+						.setType(convertPostgresTypeToEdmType(param.getAttribute())))
+				.collect(Collectors.toList());
+	}
 
 }

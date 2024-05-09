@@ -18,8 +18,8 @@ public class TdxQueryParam {
     @EqualsAndHashCode.Include
     private Long id;
 
-    @ManyToOne
-    @JoinColumn(name = "tdx_query_id")
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "tdx_query_id", nullable = false)
     private TdxQuery tdxQuery;
 
     private String parameter;
