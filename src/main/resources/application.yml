@@ -1,6 +1,13 @@
+#server:
+#  port: 8081
 server:
-  port: 8081
-
+  port: 443
+  ssl:
+    enabled: true
+    key-store: src/main/resources/bootsecurity.p12
+    key-store-password: xlqtmqoffl
+    key-store-type: PKCS12
+    key-alias: bootsecurity
 spring:
   datasource:
     driverClassName: net.sf.log4jdbc.sql.jdbcapi.DriverSpy
