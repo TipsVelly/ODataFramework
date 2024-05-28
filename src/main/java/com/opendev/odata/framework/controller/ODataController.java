@@ -9,6 +9,7 @@ import org.apache.olingo.commons.api.edm.provider.CsdlEdmProvider;
 import org.apache.olingo.server.api.OData;
 import org.apache.olingo.server.api.ODataHttpHandler;
 import org.apache.olingo.server.api.ServiceMetadata;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -25,10 +26,9 @@ import java.util.ArrayList;
 @RequestMapping(ODataController.URI)
 @RequiredArgsConstructor
 public class ODataController {
-	
+
 	protected static final String URI = "/OData/V1.0";
 
-	
 	private final CsdlEdmProvider csdlEdmProvider;
 
 	private final CustomActionProcessor customActionProcessor;
@@ -40,7 +40,16 @@ public class ODataController {
 	private final CustomPrimitiveProcessor customPrimitiveProcessor;
 
 	@RequestMapping(value = "*")
+	@CrossOrigin(origins = "http://localhost:8080") // specify the allowed origin
 	public void process(HttpServletRequest request, HttpServletResponse response) {
+
+		response.setHeader("Access-Control-Allow-Origin", "**");
+		response.setHeader("Access-Control-Allow-Credentials", "true");
+		response.setHeader("Access-Control-Allow-Methods", "*");
+		response.setHeader("Access-Control-Max-Age", "3600");
+		response.setHeader("Access-Control-Allow-Headers",
+				"Origin, X-Requested-With, Content-Type, Accept, Authorization");
+
 		OData odata = OData.newInstance();
 		ServiceMetadata edm = odata.createServiceMetadata(csdlEdmProvider,
 				new ArrayList<>());
