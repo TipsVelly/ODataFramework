@@ -106,3 +106,8 @@ The expected result is the hardcoded list of product entries, which we have code
   * https://olingo.apache.org/doc/odata4/tutorials/read/tutorial_read.html
 * Rohit Ghatol's repository
   * https://github.com/rohitghatol/spring-boot-Olingo-oData
+
+
+## ssl 적용 
+
+https://velog.io/@code12/Spring-Security-SSLHTTPS-%EC%82%AC%EC%9A%A9%ED%95%98%EA%B8%B0
