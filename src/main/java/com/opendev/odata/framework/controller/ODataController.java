@@ -40,16 +40,7 @@ public class ODataController {
 	private final CustomPrimitiveProcessor customPrimitiveProcessor;
 
 	@RequestMapping(value = "*")
-	@CrossOrigin(origins = "http://localhost:8080") // specify the allowed origin
 	public void process(HttpServletRequest request, HttpServletResponse response) {
-
-		response.setHeader("Access-Control-Allow-Origin", "**");
-		response.setHeader("Access-Control-Allow-Credentials", "true");
-		response.setHeader("Access-Control-Allow-Methods", "*");
-		response.setHeader("Access-Control-Max-Age", "3600");
-		response.setHeader("Access-Control-Allow-Headers",
-				"Origin, X-Requested-With, Content-Type, Accept, Authorization");
-
 		OData odata = OData.newInstance();
 		ServiceMetadata edm = odata.createServiceMetadata(csdlEdmProvider,
 				new ArrayList<>());
