@@ -28,6 +28,9 @@ public class TdxQuery {
     @OneToMany(mappedBy = "tdxQuery", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
     private List<TdxQueryParam> tdxQueryParams = new ArrayList<>();
 
+    @OneToMany(mappedBy = "tdxQuery", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    private List<TdxQueryColumn> tdxQueryColumns = new ArrayList<>();
+
     private String httpRequest;
 
     private String odataQueryName;
@@ -47,6 +50,13 @@ public class TdxQuery {
         for (TdxQueryParam param : newParams) {
             param.assignToQuery(this);
             this.tdxQueryParams.add(param);
+        }
+    }
+    public void updateColumns(List<TdxQueryColumn> newColumns) {
+        this.tdxQueryColumns.clear();
+        for (TdxQueryColumn column : newColumns) {
+            column.assignToQuery(this);
+            this.tdxQueryColumns.add(column);
         }
     }
 
